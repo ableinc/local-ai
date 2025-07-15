@@ -14,4 +14,8 @@ export default defineConfig({
   server: {
     port: parseInt(process.env.VITE_APP_PORT || "5173", 10),
   },
+  build: {
+    outDir: "dist",
+    emptyOutDir: true
+  }
 })

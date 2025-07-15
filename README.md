@@ -1,6 +1,16 @@
 # Ollama GUI Chat Application
 
-A modern, full-featured chat application that runs entirely on your local machine. Built with React, TypeScript, and Vite, featuring a sleek UI powered by shadcn/ui components and Tailwind CSS.
+A modern, full-featured desktop chat application that runs entirely on your local machine. Built with Electron, React, TypeScript, and Vite, featuring a sleek UI powered by shadcn/ui components and Tailwind CSS.
+
+## 📥 Quick Start
+
+Download the latest version for your platform from our [GitHub Releases](https://github.com/ableinc/local-ai/releases) page:
+
+- **macOS**: Download `Local.Ai-{version}.dmg` (Apple Silicon/Intel)
+- **Windows**: Download `Local.Ai-Setup-{version}.exe`
+- **Linux**: Download `Local.Ai-{version}.AppImage` or `.deb` package
+
+After installation, make sure you have Ollama running locally before starting the app.
 
 ## ✨ Features
 
@@ -16,13 +26,15 @@ A modern, full-featured chat application that runs entirely on your local machin
 
 ## 🛠️ Tech Stack
 
+- **Desktop App**: Electron with auto-updates
 - **Frontend**: React 19, TypeScript, Vite
 - **UI Components**: shadcn/ui, Radix UI primitives
 - **Styling**: Tailwind CSS 4.x
 - **Database**: SQLite (better-sqlite3)
-- **Backend**: Express.js API server
+- **Backend**: Express.js API server (runs embedded)
 - **AI Integration**: Ollama API
 - **Build Tool**: Vite with TypeScript
+- **Packaging**: electron-builder
 
 ## 📋 Prerequisites
 
@@ -55,7 +67,7 @@ ollama serve
 
 1. **Clone the repository** (if applicable) or navigate to the project directory:
 ```bash
-cd ollama-gui-chat
+cd localai
 ```
 
 2. **Install dependencies**:
@@ -100,7 +112,7 @@ npm run dev
 ## 🏗️ Project Structure
 
 ```
-ollama-gui-chat/
+local-ai/
 ├── src/
 │   ├── components/
 │   │   ├── ui/           # shadcn/ui components
@@ -110,8 +122,10 @@ ollama-gui-chat/
 │   ├── lib/
 │   │   └── utils.ts      # Utility functions
 │   └── App.tsx           # Main application component
+│   ├── server/
+│   │   └── index.js 
+│   │   └── database-service.js 
 ├── server.js             # Express backend server
-├── database-service.js   # SQLite database operations
 └── package.json
 ```
 
@@ -144,10 +158,18 @@ The backend provides these REST endpoints:
 - Check if you have models installed: `ollama list`
 - Pull a model: `ollama pull llama2`
 
+**App shows blank screen or won't start:**
+- Check if Ollama is running on port 11434
+- Try running with debug mode: Right-click app icon > Run with Debug Mode
+- Check the app logs:
+  - macOS: `~/Library/Logs/Local Ai/main.log`
+  - Windows: `%USERPROFILE%\AppData\Roaming\Local Ai\logs\main.log`
+  - Linux: `~/.config/Local Ai/logs/main.log`
+
 **Connection refused errors:**
-- Verify Ollama is running on port 11434
-- Check if the backend server is running on port 3001
-- Ensure no firewall is blocking the connections
+- Verify Ollama is running and accessible
+- Check your firewall settings
+- Make sure port 11434 is not blocked
 
 **Database errors:**
 - The SQLite database is created automatically
@@ -160,16 +182,39 @@ The backend provides these REST endpoints:
 
 ## 🏗️ Building for Production
 
+### Running from Source
+
 ```bash
 # Build the application
 npm run build
 
-# Start the server (serve via reverse proxy)
-npm start
+# Start in development mode
+npm run dev:full
 ```
 
-**Open your browser** and navigate to:
-   - App: `http://localhost:3001` (or the port shown in terminal)
+### Building Desktop Apps
+
+```bash
+# Build for current platform
+npm run build:mac    # macOS arm64/x64
+npm run build:win    # Windows x64
+npm run build:linux  # Linux x64
+
+# The packaged applications will be in the release/ directory
+```
+
+### Release Channels
+
+- **Stable**: Download from [GitHub Releases](https://github.com/ableinc/local-ai/releases)
+- **Development**: Build from source using instructions above
+
+### Code Signing
+
+The macOS app is notarized and signed with an Apple Developer ID certificate. Windows builds are signed with an EV Code Signing certificate. This ensures:
+
+- No security warnings on launch
+- Gatekeeper approval on macOS
+- SmartScreen approval on Windows
 
 ## 🤝 Contributing
 

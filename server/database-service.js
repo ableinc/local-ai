@@ -1,17 +1,36 @@
 import Database from 'better-sqlite3';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import { mkdirSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 class DatabaseService {
   constructor() {
-    // Initialize database in the project root
-    const dbPath = join(__dirname, 'chats.db');
-    this.db = new Database(dbPath);
-    this.initializeTables();
+    // Get the app data directory
+    const userDataPath = process.env.ELECTRON_APP_DATA_PATH || __dirname;
+    
+    // Ensure the directory exists
+    try {
+      mkdirSync(userDataPath, { recursive: true });
+    } catch (error) {
+      if (error.code !== 'EEXIST') {
+        console.error('Failed to create database directory:', error);
+      }
+    }
+    
+    // Initialize database in the app data directory
+    const dbPath = join(userDataPath, 'chats.db');
+    console.log('Database path:', dbPath);
+    
+    try {
+      this.db = new Database(dbPath);
+      this.initializeTables();
+    } catch (error) {
+      console.error('Failed to initialize database:', error);
+      throw error;
+    }
   }
 
   initializeTables() {

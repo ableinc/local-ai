@@ -3,27 +3,52 @@ import cors from 'cors';
 import { dbService } from './database-service.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const isDev = process.resourcesPath === undefined;
+
+function resolveResourcePath(...segments) {
+  const base = isDev
+    ? path.join(__dirname, '..')
+    : process.resourcesPath
+  return path.join(base, ...segments)
+}
+
+// Load .env for packaged builds
+dotenv.config({ path: resolveResourcePath('server', '.env') });
 
 const app = express();
 const PORT = process.env.VITE_API_PORT || 3001;
 const ollamaApiUrl = process.env.VITE_OLLAMA_BASE_URL || 'http://localhost:11434';
 const embeddingModelName = process.env.VITE_EMBEDDING_MODEL_NAME || 'nomic-embed-text';
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 app.use(cors());
 app.use(express.json());
 
 // Serve the frontend
-app.use('/', express.static(path.join(__dirname, '../dist')));
-app.get('/', async (req, res) => {
-  res.sendFile(path.join(__dirname, '../dist/index.html'), (err) => {
-    if (err) {
-      console.error('Error serving index.html:', err);
-      res.status(500).send('App is not available, please try again later.');
-    }
+if (!isDev) {
+  app.use('/', express.static(resolveResourcePath('server', '/')));
+  app.get('/', async (req, res) => {
+    res.sendFile(resolveResourcePath('server', 'index.html'), (err) => {
+      if (err) {
+        console.error('Error serving index.html:', err);
+        res.status(500).send('App is not available, please try again later.');
+      }
+    });
   });
-});
+} else {
+  app.use('/', express.static(path.join(__dirname, '../dist')));
+  app.get('/', async (req, res) => {
+    res.sendFile(path.join(__dirname, '../dist/index.html'), (err) => {
+      if (err) {
+        console.error('Error serving index.html:', err);
+        res.status(500).send('App is not available, please try again later.');
+      }
+    });
+  });
+}
 
 // Health check endpoint
 app.get('/api/health', async (req, res) => {
@@ -196,5 +221,5 @@ app.delete('/api/messages/:id', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Ollama GUI Chat (PROD) is running at http://localhost:${PORT}`);
+  console.log(`Ollama GUI Chat (${process.env.NODE_ENV}) is running at http://localhost:${PORT}`);
 });
