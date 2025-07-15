@@ -7,6 +7,12 @@ exports.default = async function notarizing(context) {
     return;
   }
 
+  // Check if notarization should be skipped for development builds
+  if (process.env.SKIP_NOTARIZATION === 'true') {
+    console.log('Skipping notarization (SKIP_NOTARIZATION=true)');
+    return;
+  }
+
   // Check for required environment variables
   const { APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID } = process.env;
   if (!APPLE_ID || !APPLE_APP_SPECIFIC_PASSWORD || !APPLE_TEAM_ID) {

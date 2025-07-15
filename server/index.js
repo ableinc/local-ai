@@ -8,16 +8,20 @@ import dotenv from 'dotenv';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const isDev = process.resourcesPath === undefined;
+console.info("Running in development mode:", isDev);
 
 function resolveResourcePath(...segments) {
   const base = isDev
     ? path.join(__dirname, '..')
     : process.resourcesPath
-  return path.join(base, ...segments)
+  if (isDev) {
+    return path.join(base, ...segments);
+  }
+  return path.join(base, 'server', ...segments)
 }
 
 // Load .env for packaged builds
-dotenv.config({ path: resolveResourcePath('server', '.env') });
+dotenv.config({ path: resolveResourcePath('.env') });
 
 const app = express();
 const PORT = process.env.VITE_API_PORT || 3001;
@@ -29,9 +33,9 @@ app.use(express.json());
 
 // Serve the frontend
 if (!isDev) {
-  app.use('/', express.static(resolveResourcePath('server', '/')));
+  app.use('/', express.static(resolveResourcePath('/')));
   app.get('/', async (req, res) => {
-    res.sendFile(resolveResourcePath('server', 'index.html'), (err) => {
+    res.sendFile(resolveResourcePath('index.html'), (err) => {
       if (err) {
         console.error('Error serving index.html:', err);
         res.status(500).send('App is not available, please try again later.');

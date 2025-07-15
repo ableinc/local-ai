@@ -154,10 +154,21 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  if (serverProcess) serverProcess.kill();
+  if (serverProcess) {
+    serverProcess.kill();
+    serverProcess = null;
+  }
   if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+app.on('activate', async () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    if (!serverProcess) {
+      const port = parseInt(process.env.VITE_API_PORT || '3001');
+      console.log('Waiting for server to be ready on port:', port);
+      startExpressServer();
+      await waitForServer(port);
+    }
+    createWindow();
+  }
 });
