@@ -26,7 +26,7 @@ function App() {
   const [message, setMessage] = useState('')
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [selectedModel, setSelectedModel] = useState('assistant')
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [availableModels, setAvailableModels] = useState<OllamaModel[]>([])
   const [modelsLoading, setModelsLoading] = useState(true)
   const [chats, setChats] = useState<Chat[]>([])
@@ -139,7 +139,6 @@ function App() {
         })
         if (response.ok) {
           const data = await response.json()
-          setAvailableModels(data.models || [])
           // Set the first model as default if assistant is not available
           if (data.models && data.models.length > 0) {
             const hasAssistant = data.models.some((model: OllamaModel) => 
@@ -149,6 +148,7 @@ function App() {
               setSelectedModel(data.models[0].name)
             }
           }
+          setAvailableModels(data.models || [])
         }
       } catch (error) {
         console.error('Failed to fetch models:', error)
@@ -168,6 +168,13 @@ function App() {
     if (!healthStatus.server && !healthStatus.ollama) {
       return;
     }
+    if (!selectedModel) {
+      toast.error('No model selected', {
+        description: 'Please select a model to continue',
+        duration: 5000,
+      });
+      return;
+    };
     if (message.trim() && !isLoading) {
       const userMessage = message.trim()
       
@@ -524,7 +531,7 @@ function App() {
           {/* Model Selection Dropdown */}
           <AppModelDropdown 
             availableModels={availableModels} 
-            selectedModel={selectedModel} 
+            selectedModel={selectedModel || ''} 
             setSelectedModel={setSelectedModel} 
             modelsLoading={modelsLoading} 
             isLoading={isLoading}
