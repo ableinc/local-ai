@@ -24,66 +24,7 @@ dotenv.config({ path: resolveResourcePath('server', '.env') });
 console.log('Environment:', { isDev, NODE_ENV: process.env.NODE_ENV });
 
 let serverProcess = null;
-let splashWindow = null;
 let mainWindow = null;
-
-function createSplashWindow() {
-  splashWindow = new BrowserWindow({
-    width: 400,
-    height: 400,
-    transparent: true,
-    frame: false,
-    alwaysOnTop: true,
-    center: true,
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
-    }
-  });
-
-  // Load a simple HTML splash screen
-  splashWindow.loadURL(`data:text/html;charset=utf-8,
-    <html>
-      <head>
-        <style>
-          body {
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background: transparent;
-            font-family: system-ui, -apple-system, sans-serif;
-          }
-          .container {
-            text-align: center;
-            animation: fadeIn 0.5s ease-in;
-          }
-          img {
-            width: 128px;
-            height: 128px;
-            margin-bottom: 20px;
-          }
-          .loading {
-            color: #666;
-            font-size: 14px;
-          }
-          @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <img src="file://${resolveResourcePath('assets', 'icon.png')}" />
-          <div class="loading">Loading...</div>
-        </div>
-      </body>
-    </html>
-  `);
-}
 
 function startExpressServer() {
   // Use Electron's embedded Node binary
@@ -150,11 +91,7 @@ function createWindow() {
   
   // Load from your Express server
   mainWindow.loadURL(serverUrl).then(() => {
-    mainWindow.show(); // Show window only after content is loaded
-    if (splashWindow) {
-      splashWindow.close();
-      splashWindow = null;
-    }
+    mainWindow.show();
   }).catch((error) => {
     console.error('Failed to load app:', error);
     // Show error in window
@@ -169,10 +106,6 @@ function createWindow() {
       </html>
     `);
     mainWindow.show();
-    if (splashWindow) {
-      splashWindow.close();
-      splashWindow = null;
-    }
   });
 }
 
@@ -206,8 +139,6 @@ function waitForServer(port, timeout = 10000) {
 }
 
 app.whenReady().then(async () => {
-  // Show splash screen immediately
-  createSplashWindow();
   
   // Start server
   startExpressServer();
@@ -249,10 +180,6 @@ app.on('window-all-closed', () => {
   if (serverProcess) {
     serverProcess.kill();
     serverProcess = null;
-  }
-  if (splashWindow) {
-    splashWindow.close();
-    splashWindow = null;
   }
   if (process.platform !== 'darwin') app.quit();
 });
