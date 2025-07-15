@@ -36,6 +36,7 @@
       "dist/**/*",
       "electron/**/*",
       "server/**/*",
+      "node_modules/**/*",
       ".env"
     ],
     "extraResources": [
@@ -54,6 +55,10 @@
       {
         "from": "dist",
         "to": "server/"
+      },
+      {
+        "from": "node_modules",
+        "to": "server/node_modules"
       }
     ],
     "mac": {
