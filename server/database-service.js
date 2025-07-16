@@ -32,7 +32,7 @@ class DatabaseService {
         console.log('Copied better_sqlite3.node to:', sqliteBinaryPath);
       }
       this.db = new Database(dbPath, {
-        nativeBinding: join(userDataPath, 'better_sqlite3.node')
+        nativeBinding: sqliteBinaryPath
       });
       this.initializeTables();
     } catch (error) {
