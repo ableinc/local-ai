@@ -152,27 +152,7 @@ app.whenReady().then(async () => {
     createWindow();
   } catch (error) {
     console.error('Server failed to start:', error);
-    if (splashWindow) {
-      splashWindow.loadURL(`data:text/html;charset=utf-8,
-        <html>
-          <head>
-            <style>
-              body { 
-                font-family: system-ui; 
-                padding: 20px; 
-                color: #ff0000;
-              }
-            </style>
-          </head>
-          <body>
-            <h3>Failed to start server</h3>
-            <p>${error.message}</p>
-          </body>
-        </html>
-      `);
-    }
-    // Don't quit immediately, let user see the error
-    setTimeout(() => app.quit(), 5000);
+    app.quit();
   }
 });
 
