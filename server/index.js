@@ -24,9 +24,9 @@ function resolveResourcePath(...segments) {
 dotenv.config({ path: resolveResourcePath('.env') });
 
 const app = express();
-const PORT = process.env.VITE_API_PORT || 3001;
-const ollamaApiUrl = process.env.VITE_OLLAMA_BASE_URL || 'http://localhost:11434';
-const embeddingModelName = process.env.VITE_EMBEDDING_MODEL_NAME || 'nomic-embed-text';
+const PORT = process.env.VITE_API_PORT;
+const ollamaApiUrl = process.env.VITE_OLLAMA_BASE_URL;
+const embeddingModelName = process.env.VITE_EMBEDDING_MODEL_NAME;
 
 app.use(cors());
 app.use(express.json());
@@ -224,6 +224,180 @@ app.delete('/api/messages/:id', (req, res) => {
   }
 });
 
+// Embedding endpoints
+app.post('/api/messages/:id/embedding', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const message = dbService.getMessageById(id);
+    
+    if (!message) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+    
+    // Check if embedding already exists
+    const existingEmbedding = dbService.getEmbedding(id);
+    if (existingEmbedding) {
+      return res.json({ embedding: existingEmbedding });
+    }
+    
+    // Generate embedding
+    const response = await fetch(`${ollamaApiUrl}/api/embeddings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: embeddingModelName,
+        prompt: message.content
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to generate embedding');
+    }
+    
+    const data = await response.json();
+    const embedding = data.embedding;
+    
+    // Save embedding
+    dbService.saveEmbedding(id, embedding);
+    
+    res.json({ embedding });
+  } catch (error) {
+    console.error('Error generating embedding:', error);
+    res.status(500).json({ error: 'Failed to generate embedding' });
+  }
+});
+
+// Get conversation context using embeddings
+app.post('/api/chats/:id/context', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { message, recentCount = 5, similarCount = 3 } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+    
+    // Generate embedding for the current message
+    const embeddingResponse = await fetch(`${ollamaApiUrl}/api/embeddings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: embeddingModelName,
+        prompt: message
+      })
+    });
+    
+    if (!embeddingResponse.ok) {
+      throw new Error('Failed to generate embedding');
+    }
+    
+    const embeddingData = await embeddingResponse.json();
+    const queryEmbedding = embeddingData.embedding;
+    
+    // Get recent messages
+    const recentMessages = dbService.getRecentMessages(id, recentCount);
+    
+    // Get similar messages
+    const similarMessages = dbService.getSimilarMessages(id, queryEmbedding, similarCount);
+    
+    // Combine and deduplicate
+    const messageMap = new Map();
+    
+    // Add similar messages first (higher priority)
+    similarMessages.forEach(msg => {
+      messageMap.set(msg.id, msg);
+    });
+    
+    // Add recent messages
+    recentMessages.forEach(msg => {
+      if (!messageMap.has(msg.id)) {
+        messageMap.set(msg.id, { ...msg, similarity: 0 });
+      }
+    });
+    
+    // Convert back to array and sort by relevance/recency
+    const contextMessages = Array.from(messageMap.values())
+      .sort((a, b) => {
+        // Prioritize similar messages
+        if (a.similarity && b.similarity) {
+          return b.similarity - a.similarity;
+        }
+        // Then by recency
+        return b.id - a.id;
+      });
+    
+    res.json({ contextMessages });
+  } catch (error) {
+    console.error('Error getting context:', error);
+    res.status(500).json({ error: 'Failed to get context' });
+  }
+});
+
+// Debug endpoint to check embedding model availability
+app.get('/api/debug/embedding-model', async (req, res) => {
+  try {
+    const response = await fetch(`${ollamaApiUrl}/api/tags`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch models');
+    }
+    
+    const data = await response.json();
+    const hasEmbeddingModel = data.models && data.models.some(model => 
+      model.name.includes(embeddingModelName)
+    );
+    
+    res.json({
+      embeddingModelName,
+      available: hasEmbeddingModel,
+      allModels: data.models?.map(m => m.name) || []
+    });
+  } catch (error) {
+    console.error('Error checking embedding model:', error);
+    res.status(500).json({ error: 'Failed to check embedding model' });
+  }
+});
+
+// Add error handling for unhandled promises and exceptions
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit the process, just log the error
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  // Don't exit the process for now, just log
+});
+
+// Add graceful shutdown handling
+process.on('SIGINT', () => {
+  console.log('Received SIGINT, shutting down gracefully...');
+  dbService.close();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('Received SIGTERM, shutting down gracefully...');
+  dbService.close();
+  process.exit(0);
+});
+
 app.listen(PORT, () => {
   console.log(`Ollama GUI Chat (${process.env.NODE_ENV}) is running at http://localhost:${PORT}`);
+  console.log(`Using embedding model: ${embeddingModelName}`);
+  console.log(`Database service initialized: ${dbService ? 'SUCCESS' : 'FAILED'}`);
+  
+  // Test database connection
+  try {
+    const chats = dbService.getAllChats();
+    console.log(`Database connection test: Found ${chats.length} chats`);
+  } catch (error) {
+    console.error('Database connection test failed:', error);
+  }
+}).on('error', (error) => {
+  console.error('Server failed to start:', error);
+  process.exit(1);
 });

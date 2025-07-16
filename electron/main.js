@@ -86,7 +86,7 @@ function createWindow() {
     win.webContents.openDevTools();
   }
 
-  const port = process.env.VITE_API_PORT || 3001;
+  const port = process.env.VITE_API_PORT;
   const serverUrl = `http://localhost:${port}`;
   
   // Load from your Express server
@@ -143,7 +143,7 @@ app.whenReady().then(async () => {
   // Start server
   startExpressServer();
   
-  const port = parseInt(process.env.VITE_API_PORT || '3001');
+  const port = parseInt(process.env.VITE_API_PORT);
   console.log('Waiting for server to be ready on port:', port);
   
   try {
@@ -167,7 +167,7 @@ app.on('window-all-closed', () => {
 app.on('activate', async () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     if (!serverProcess) {
-      const port = parseInt(process.env.VITE_API_PORT || '3001');
+      const port = parseInt(process.env.VITE_API_PORT);
       console.log('Waiting for server to be ready on port:', port);
       startExpressServer();
       await waitForServer(port);

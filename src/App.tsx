@@ -33,10 +33,11 @@ function App() {
   const [currentChatId, setCurrentChatId] = useState<number | null>(null)
   const [messageOffset, setMessageOffset] = useState(0)
   const [hasMoreMessages, setHasMoreMessages] = useState(false)
-  const [abortController, setAbortController] = useState<AbortController | null>(null)
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
-  const ollamaBaseUrl = import.meta.env.VITE_OLLAMA_BASE_URL || 'http://localhost:11434';
-  const appName = import.meta.env.VITE_APP_NAME || "Local AI Chat";
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+
+  const ollamaBaseUrl = import.meta.env.VITE_OLLAMA_BASE_URL;
+  const appName = import.meta.env.VITE_APP_NAME;
 
   // Load chats on component mount
   useEffect(() => {
@@ -141,10 +142,14 @@ function App() {
           const data = await response.json()
           // Set the first model as default if assistant is not available
           if (data.models && data.models.length > 0) {
-            const hasAssistant = data.models.some((model: OllamaModel) => 
-              model.name.includes('assistant')
-            )
-            if (!hasAssistant) {
+            for (const model of data.models) {
+              if (model.name.includes('assistant')) {
+                setSelectedModel(model.name)
+                break
+              }
+            }
+            if (!selectedModel) {
+              // If no assistant model is selected, default to the first model
               setSelectedModel(data.models[0].name)
             }
           }
@@ -162,7 +167,46 @@ function App() {
     }
 
     fetchModels()
-  }, [ollamaBaseUrl, healthStatus])
+  }, [ollamaBaseUrl, healthStatus, selectedModel])
+
+  // Add helper function to prepare context with embeddings
+  const prepareConversationContext = async (
+    chatId: number, 
+    currentMessage: string
+  ): Promise<Array<{role: string, content: string}>> => {
+    try {
+      // Get relevant context using embeddings
+      const contextMessages = await apiService.getConversationContext(
+        chatId, 
+        currentMessage,
+        5, // Get 5 most recent messages
+        3  // Get 3 most similar messages
+      );
+      
+      // Start with a system prompt
+      const context = [{
+        role: 'system',
+        content: 'You are a helpful AI assistant. Use the conversation context provided to give relevant and coherent responses based on our previous discussion.'
+      }];
+      
+      // Add context messages
+      contextMessages.forEach(msg => {
+        context.push({
+          role: msg.role,
+          content: msg.content
+        });
+      });
+      
+      return context;
+    } catch (error) {
+      console.error('Failed to get conversation context:', error);
+      // Fallback to empty context with system prompt
+      return [{
+        role: 'system',
+        content: 'You are a helpful AI assistant.'
+      }];
+    }
+  };
 
   const handleSendMessage = async () => {
     if (!healthStatus.server && !healthStatus.ollama) {
@@ -206,6 +250,11 @@ function App() {
         setUploadedFiles([]) // Clear uploaded files after sending
         setIsLoading(true)
 
+        // Generate embedding for the user message in the background
+        apiService.generateEmbedding(userDbMessage.id).catch(err => 
+          console.error('Failed to generate embedding:', err)
+        );
+
         // Create AI response placeholder in database
         const aiDbMessage = await apiService.addMessage(chatId, 'assistant', '')
         setMessages(prev => [...prev, aiDbMessage])
@@ -215,6 +264,15 @@ function App() {
         setAbortController(controller)
 
         try {
+          // Get conversation context using embeddings
+          const conversationContext = await prepareConversationContext(chatId, userMessage);
+          
+          // Add the current user message with file context
+          conversationContext.push({
+            role: 'user',
+            content: fullUserMessage
+          });
+
           const response = await fetch(`${ollamaBaseUrl}/api/chat`, {
             method: 'POST',
             headers: {
@@ -222,12 +280,7 @@ function App() {
             },
             body: JSON.stringify({
               model: selectedModel,
-              messages: [
-                {
-                  role: 'user',
-                  content: fullUserMessage // Send full message with file context to AI
-                }
-              ],
+              messages: conversationContext,
               stream: true
             }),
             signal: controller.signal
@@ -274,6 +327,11 @@ function App() {
               }
             }
           }
+
+          // Generate embedding for the AI response in the background
+          apiService.generateEmbedding(aiDbMessage.id).catch(err => 
+            console.error('Failed to generate embedding:', err)
+          );
         } catch (ollamaError) {
           console.error('Error calling Ollama:', ollamaError)
           
@@ -399,7 +457,19 @@ function App() {
       const controller = new AbortController();
       setAbortController(controller);
       
-      // Generate new response (similar to handleSendMessage but with existing user message)
+      // Get conversation context using embeddings
+      const conversationContext = await prepareConversationContext(
+        currentChatId, 
+        userMessage.content
+      );
+      
+      // Add the user message
+      conversationContext.push({
+        role: 'user',
+        content: userMessage.content
+      });
+      
+      // Generate new response with context
       const response = await fetch(`${ollamaBaseUrl}/api/chat`, {
         method: 'POST',
         headers: {
@@ -407,12 +477,7 @@ function App() {
         },
         body: JSON.stringify({
           model: selectedModel,
-          messages: [
-            {
-              role: 'user',
-              content: userMessage.content
-            }
-          ],
+          messages: conversationContext,
           stream: true
         }),
         signal: controller.signal
@@ -458,6 +523,11 @@ function App() {
           }
         }
       }
+
+      // Generate embedding for the new response
+      apiService.generateEmbedding(aiDbMessage.id).catch(err => 
+        console.error('Failed to generate embedding:', err)
+      );
       
       toast.success('Response regenerated', {
         duration: 3000,

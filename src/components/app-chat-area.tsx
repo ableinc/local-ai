@@ -121,7 +121,7 @@ export function AppChatArea({
         className="flex-1 overflow-y-auto overflow-x-hidden"
         onScroll={handleScrollWithAutoScroll}
       >
-        <div className="flex flex-col w-full max-w-full px-4">
+        <div className="flex flex-col w-full max-w-full px-4 pt-5">
           {messages.length === 0 ? (
             <div className="flex items-center justify-center h-full text-muted-foreground">
               <p>Start a conversation...</p>
