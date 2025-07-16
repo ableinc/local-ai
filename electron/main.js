@@ -19,7 +19,7 @@ function resolveResourcePath(...segments) {
 }
 
 // Load .env for packaged builds
-dotenv.config({ path: resolveResourcePath('server', '.env') });
+dotenv.config({ path: resolveResourcePath('.env') });
 
 console.log('Environment:', { isDev, NODE_ENV: process.env.NODE_ENV });
 
@@ -31,13 +31,15 @@ function startExpressServer() {
   const nodePath = isDev ? 'node' : process.execPath;
   
   // Get the correct server path
-  const serverPath = resolveResourcePath('server', 'index.js');
-  console.log('Starting server with:', { nodePath, serverPath });
+  const serverPath = resolveResourcePath('server.js');
+  const betterSqlite3Path = resolveResourcePath('better_sqlite3.node');
+  console.log('Starting server with:', { nodePath, serverPath, betterSqlite3Path });
   
   const env = {
     ...process.env,
     ELECTRON_APP_DATA_PATH: app.getPath('userData'),
-    ELECTRON_RUN_AS_NODE: '1'
+    ELECTRON_RUN_AS_NODE: '1',
+    BETTER_SQLITE3_PATH: betterSqlite3Path,
   };
     
   try {

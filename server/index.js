@@ -14,10 +14,7 @@ function resolveResourcePath(...segments) {
   const base = isDev
     ? path.join(__dirname, '..')
     : process.resourcesPath
-  if (isDev) {
-    return path.join(base, ...segments);
-  }
-  return path.join(base, 'server', ...segments)
+  return path.join(base, ...segments)
 }
 
 // Load .env for packaged builds

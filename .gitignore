@@ -24,3 +24,5 @@ dist-ssr
 *.sw?
 *.db
 release/
+build/index.js
+build/index.js.map

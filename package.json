@@ -1,10 +1,11 @@
 {
-  "name": "local-ai",
+  "name": "com.capable.localai",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "A desktop chat UI for Ollama using Electron and React.",
   "author": "Jaylen Douglas",
+  "email": "hello@jaylendouglas.com",
   "scripts": {
     "dev": "vite",
     "dev:server": "node --watch --env-file=.env ./server/index.js",
@@ -20,7 +21,8 @@
     "build:linux": "npm run build && electron-builder --linux --x64",
     "build:mac:dev": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false SKIP_NOTARIZATION=true electron-builder --mac --arm64 --dir",
     "build:win:dev": "npm run build && electron-builder --win --x64 --dir",
-    "build:linux:dev": "npm run build && electron-builder --linux --x64"
+    "build:linux:dev": "npm run build && electron-builder --linux --x64",
+    "build:server": "npm rebuild && bun build --minify --sourcemap --target=node --format=esm ./server/index.js --outdir ./build"
   },
   "main": "electron/main.js",
   "build": {
@@ -33,30 +35,40 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
-      "server/**/*",
-      "node_modules/**/*",
       ".env"
     ],
     "extraResources": [
       {
-        "from": "server",
-        "to": "server"
-      },
-      {
         "from": "node_modules/better-sqlite3/build/Release/better_sqlite3.node",
-        "to": "server/better_sqlite3.node"
+        "to": "better_sqlite3.node"
       },
       {
         "from": ".env",
-        "to": "server/.env"
+        "to": ".env"
       },
       {
-        "from": "dist",
-        "to": "server/"
+        "from": "dist/assets",
+        "to": "assets"
       },
       {
-        "from": "node_modules",
-        "to": "server/node_modules"
+        "from": "dist/index.html",
+        "to": "index.html"
+      },
+      {
+        "from": "dist/pdf.worker.min.js",
+        "to": "pdf.worker.min.js"
+      },
+      {
+        "from": "dist/vite.svg",
+        "to": "vite.svg"
+      },
+      {
+        "from": "build/index.js",
+        "to": "server.js"
+      },
+      {
+        "from": "build/index.js.map",
+        "to": "server.js.map"
       }
     ],
     "mac": {

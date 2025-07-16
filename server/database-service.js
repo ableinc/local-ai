@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { mkdirSync } from 'fs';
+import { mkdirSync, copyFileSync, existsSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -25,7 +25,15 @@ class DatabaseService {
     console.log('Database path:', dbPath);
     
     try {
-      this.db = new Database(dbPath);
+      // Move sqlite binary if it doesn't exist
+      const sqliteBinaryPath = join(userDataPath, 'better_sqlite3.node');
+      if (!existsSync(sqliteBinaryPath)) {
+        copyFileSync(process.env.BETTER_SQLITE3_PATH, sqliteBinaryPath);
+        console.log('Copied better_sqlite3.node to:', sqliteBinaryPath);
+      }
+      this.db = new Database(dbPath, {
+        nativeBinding: join(userDataPath, 'better_sqlite3.node')
+      });
       this.initializeTables();
     } catch (error) {
       console.error('Failed to initialize database:', error);
