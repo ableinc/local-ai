@@ -41,7 +41,7 @@ After installation, make sure you have Ollama running locally before starting th
 Before running this application, ensure you have:
 
 1. **Node.js** (v22 or higher)
-2. **npm** or **yarn**
+2. **bun** or **yarn**
 3. **Ollama** installed and running on your system
 
 ### Installing Ollama
@@ -72,20 +72,20 @@ cd localai
 
 2. **Install dependencies**:
 ```bash
-npm install
+bun install
 ```
 
 3. **Start the application**:
 ```bash
 # Option 1: Start both frontend and backend simultaneously
-npm run dev:full
+bun run dev:full
 
 # Option 2: Start them separately
 # Terminal 1 - Backend server
-npm run server
+bun run server
 
 # Terminal 2 - Frontend development server
-npm run dev
+bun run dev
 ```
 
 4. **Open your browser** and navigate to (development):
@@ -186,19 +186,25 @@ The backend provides these REST endpoints:
 
 ```bash
 # Build the application
-npm run build
+bun run build
 
 # Start in development mode
-npm run dev:full
+bun run dev:full
 ```
 
 ### Building Desktop Apps
 
 ```bash
 # Build for current platform
-npm run build:mac    # macOS arm64/x64
-npm run build:win    # Windows x64
-npm run build:linux  # Linux x64
+bun run build:mac    # macOS arm64/x64
+bun run build:win    # Windows x64
+bun run build:linux  # Linux x64
+
+# Production release build
+bun run clean:hard
+bun install
+bun run build:server
+bun run build:[os] # replace [os] with mac, win or linux
 
 # The packaged applications will be in the release/ directory
 ```
