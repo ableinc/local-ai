@@ -2,7 +2,7 @@
   "name": "com.capable.localai",
   "productName": "Local Ai",
   "private": true,
-  "version": "1.1.1",
+  "version": "1.1.2",
   "type": "module",
   "description": "A desktop chat UI for Ollama using Electron and React.",
   "author": "Jaylen Douglas <hello@jaylendouglas.com> (https://jaylendouglas.com)",
@@ -61,8 +61,8 @@
         "to": "pdf.worker.min.js"
       },
       {
-        "from": "dist/vite.svg",
-        "to": "vite.svg"
+        "from": "dist/icon.svg",
+        "to": "icon.svg"
       },
       {
         "from": "build/index.js",
