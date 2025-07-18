@@ -10,7 +10,8 @@ class DatabaseService {
   constructor() {
     // Get the app data directory
     const userDataPath = process.env.ELECTRON_APP_DATA_PATH || __dirname;
-    
+    const isDev = process.resourcesPath === undefined;
+    this.db = null;
     // Ensure the directory exists
     try {
       mkdirSync(userDataPath, { recursive: true });
@@ -27,11 +28,11 @@ class DatabaseService {
     try {
       // Move sqlite binary if it doesn't exist
       const sqliteBinaryPath = join(userDataPath, 'better_sqlite3.node');
-      if (!existsSync(sqliteBinaryPath)) {
+      if (!existsSync(sqliteBinaryPath) && !isDev) {
         copyFileSync(process.env.BETTER_SQLITE3_PATH, sqliteBinaryPath);
         console.log('Copied better_sqlite3.node to:', sqliteBinaryPath);
       }
-      this.db = new Database(dbPath, {
+      this.db = new Database(dbPath, isDev ? {} : {
         nativeBinding: sqliteBinaryPath
       });
       this.initializeTables();
@@ -74,12 +75,29 @@ class DatabaseService {
         FOREIGN KEY (message_id) REFERENCES messages (id) ON DELETE CASCADE
       )
     `);
+    
+    // Create app settings table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS app_settings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL UNIQUE,
+        toggle BOOLEAN NOT NULL,
+        disabled BOOLEAN NOT NULL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    // Insert default app settings if they don't exist
+    this.db.exec(`
+      INSERT OR IGNORE INTO app_settings (title, toggle, disabled) VALUES
+      ('use_memory', 1, 0)
+    `);
 
     // Create indexes for better performance
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages (chat_id);
       CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages (created_at);
       CREATE INDEX IF NOT EXISTS idx_message_embeddings_message_id ON message_embeddings (message_id);
+      CREATE INDEX IF NOT EXISTS idx_app_settings_title ON app_settings (title);
     `);
   }
 
@@ -226,6 +244,25 @@ class DatabaseService {
       LIMIT ?
     `);
     return stmt.all(chatId, limit).reverse();
+  }
+
+  getAppSettings() {
+    const stmt = this.db.prepare(`
+      SELECT title, toggle
+      FROM app_settings
+      WHERE disabled = false
+    `)
+    return stmt.all();
+  }
+
+  updateAppSettings(newAppSettings) {
+    const entries = Object.entries(newAppSettings);
+    if (entries.length === 0) return;
+    const placeholders = entries.map(() => '(?, ?)').join(', ');
+    const values = entries.flatMap(([key, value]) => [key, value === true ? 1 : 0]);
+    const sql = `INSERT OR REPLACE INTO app_settings (title, toggle) VALUES ${placeholders}`;
+    const stmt = this.db.prepare(sql);
+    return stmt.run(...values);
   }
 
   // Calculate cosine similarity between two vectors

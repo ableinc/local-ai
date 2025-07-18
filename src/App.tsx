@@ -22,7 +22,7 @@ interface OllamaModel {
 }
 
 function App() {
-  const { healthStatus, checkHealth } = useApp()
+  const { healthStatus, checkHealth, settings } = useApp()
   const [message, setMessage] = useState('')
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -140,8 +140,9 @@ function App() {
         })
         if (response.ok) {
           const data = await response.json()
+          data.models = Array.isArray(data.models) ? data.models.filter((model: OllamaModel) => !model.name.includes('nomic-embed')) : [];
           // Set the first model as default if assistant is not available
-          if (data.models && data.models.length > 0) {
+          if (data.models.length > 0) {
             for (const model of data.models) {
               if (model.name.includes('assistant')) {
                 setSelectedModel(model.name)
@@ -175,6 +176,10 @@ function App() {
     currentMessage: string
   ): Promise<Array<{role: string, content: string}>> => {
     try {
+      const context: Array<{role: string, content: string}> = [];
+      if (!settings.use_memory) {
+        return context;
+      }
       // Get relevant context using embeddings
       const contextMessages = await apiService.getConversationContext(
         chatId, 
@@ -182,19 +187,16 @@ function App() {
         5, // Get 5 most recent messages
         3  // Get 3 most similar messages
       );
-      
-      // Start with a system prompt
-      const context = [{
-        role: 'system',
-        content: 'You are a helpful AI assistant. Use the conversation context provided to give relevant and coherent responses based on our previous discussion.'
-      }];
-      
       // Add context messages
       contextMessages.forEach(msg => {
         context.push({
           role: msg.role,
           content: msg.content
         });
+      });
+      context.push({
+        role: 'system',
+        content: 'You have some of our past conversation. Use the past conversation context ONLY WHEN IT IS RELEVANT to what the user is saying. If the user gives you a new command you MUST OBEY that directly.'
       });
       
       return context;
@@ -587,9 +589,22 @@ function App() {
       />
       <SidebarInset className="flex flex-col h-screen max-w-[100vw] overflow-x-hidden">
         <header className="flex h-16 shrink-0 items-center gap-2 px-4 border-b">
-          <SidebarTrigger className="-ml-1" />
+          <SidebarTrigger className="-ml-1 cursor-pointer" />
           <Separator orientation="vertical" className="mr-2 h-4" />
-          <h1 className="text-lg font-semibold">{appName}</h1>
+          <h1
+            className="font-semibold leading-tight"
+            style={{
+              fontSize: 'clamp(1.5rem, 4vw, 3.5rem)',
+              width: '20%',
+              maxWidth: 'min(100vw, 100%)',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: 'block',
+            }}
+          >
+            {appName}
+          </h1>
           <Separator orientation="vertical" className="mx-2 h-4" />
           
           {/* Health Status Indicator */}
@@ -637,6 +652,7 @@ function App() {
             onFileContent={handleFileContent}
             uploadedFiles={uploadedFiles}
             setUploadedFiles={setUploadedFiles}
+            useMemory={settings?.use_memory}
           />
         </div>
       </SidebarInset>

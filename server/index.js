@@ -358,6 +358,28 @@ app.get('/api/debug/embedding-model', async (req, res) => {
   }
 });
 
+app.get('/api/settings', async (req, res) => {
+  try {
+    const data = dbService.getAppSettings();
+    const result = {};
+    for (const column of data) {
+      result[column.title] = column.toggle === 1;
+    }
+    res.json({ data: result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/settings', async (req, res) => {
+  try {
+    dbService.updateAppSettings(req.body);
+    res.json({ message: 'success' })
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Add error handling for unhandled promises and exceptions
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);

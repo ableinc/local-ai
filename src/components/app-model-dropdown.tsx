@@ -24,7 +24,7 @@ export function AppModelDropdown({
         value={selectedModel}
         onChange={(e) => setSelectedModel(e.target.value)}
         disabled={modelsLoading || isLoading}
-        className="w-48"
+        className="w-48 cursor-pointer"
       >
         {modelsLoading ? (
           <option>Loading models...</option>

@@ -13,6 +13,7 @@ interface AppChatInputProps {
   onFileContent: (files: UploadedFile[]) => void;
   uploadedFiles: UploadedFile[];
   setUploadedFiles: React.Dispatch<React.SetStateAction<UploadedFile[]>>;
+  useMemory: boolean;
 }
 
 export function AppChatInput({
@@ -26,6 +27,7 @@ export function AppChatInput({
   onFileContent,
   uploadedFiles,
   setUploadedFiles,
+  useMemory,
 }: AppChatInputProps) {
   return (
     <div className="border-t bg-background p-4 shrink-0">
@@ -68,6 +70,11 @@ export function AppChatInput({
             : "Offline"}
         </Button>
       </div>
+      { useMemory === false && (
+        <span className="text-xs text-muted-foreground">
+          Memory context is disabled. You can change this in settings.
+        </span>
+      )}
     </div>
   );
 }
