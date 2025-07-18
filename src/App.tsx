@@ -171,7 +171,7 @@ function App() {
   }, [ollamaBaseUrl, healthStatus, selectedModel])
 
   // Add helper function to prepare context with embeddings
-  const prepareConversationContext = async (
+  const prepareConversationContext = useCallback(async (
     chatId: number, 
     currentMessage: string
   ): Promise<Array<{role: string, content: string}>> => {
@@ -208,7 +208,7 @@ function App() {
         content: 'You are a helpful AI assistant.'
       }];
     }
-  };
+  }, [settings]);
 
   const handleSendMessage = async () => {
     if (!healthStatus.server && !healthStatus.ollama) {
@@ -544,7 +544,7 @@ function App() {
       setIsLoading(false);
       setAbortController(null);
     }
-  }, [currentChatId, messages, isLoading, selectedModel, ollamaBaseUrl]);
+  }, [currentChatId, messages, isLoading, selectedModel, ollamaBaseUrl, prepareConversationContext]);
 
   // Keyboard shortcuts
   useEffect(() => {

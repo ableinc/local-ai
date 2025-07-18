@@ -1,6 +1,6 @@
 // electron/main.js
 import pkg from 'electron';
-const { app, BrowserWindow } = pkg;
+const { app, BrowserWindow, shell } = pkg;
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -91,6 +91,11 @@ function createWindow() {
   const port = process.env.VITE_API_PORT;
   const serverUrl = `http://localhost:${port}`;
   
+  // Open links in the user's browser
+  mainWindow.webContents.setWindowOpenHandler((details) => {
+    shell.openExternal(details.url); // Open URL in user's browser.
+    return { action: "deny" }; // Prevent the app from opening the URL.
+  });
   // Load from your Express server
   mainWindow.loadURL(serverUrl).then(() => {
     mainWindow.show();
