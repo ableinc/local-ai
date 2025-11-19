@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 import { Select } from "./ui/select";
 
 interface AppModelDropdownProps {
@@ -6,6 +7,25 @@ interface AppModelDropdownProps {
   setSelectedModel: (model: string) => void;
   modelsLoading: boolean;
   isLoading: boolean;
+}
+
+function getModelOptions(
+  availableModels: { name: string }[]
+): JSX.Element[] {
+  const options: JSX.Element[] = [];
+  for (let i = 0; i < availableModels.length + 1; i++) {
+    const model = availableModels[i - 1];
+    if (i === 0) {
+      options.push(<option key="default" value="" selected disabled>Select a model...</option>)
+    } else {
+      options.push(
+        <option key={model.name} value={model.name}>
+        {model.name}
+      </option>
+      );
+    }
+  }
+  return options;
 }
 
 export function AppModelDropdown({
@@ -27,16 +47,10 @@ export function AppModelDropdown({
         className="w-48 cursor-pointer"
       >
         {modelsLoading ? (
-          <option>Loading models...</option>
+          <option key={"0"}>Loading models...</option>
         ) : availableModels.length > 0 ? (
-          availableModels.map((model) => (
-            <option key={model.name} value={model.name}>
-              {model.name}
-            </option>
-          ))
-        ) : (
-          <option value="">No models available</option>
-        )}
+          getModelOptions(availableModels)
+        ) : null}
       </Select>
     </div>
   );

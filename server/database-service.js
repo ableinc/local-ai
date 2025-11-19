@@ -35,6 +35,19 @@ class DatabaseService {
       this.db = new Database(dbPath, isDev ? {} : {
         nativeBinding: sqliteBinaryPath
       });
+      
+      // Enable foreign keys and cascade deletes (not enabled by default in SQLite)
+      this.db.pragma('foreign_keys = ON');
+      
+      // Performance optimizations
+      this.db.pragma('journal_mode = WAL'); // Write-Ahead Logging for better concurrency
+      this.db.pragma('synchronous = NORMAL'); // Balance between safety and performance
+      this.db.pragma('cache_size = -64000'); // 64MB cache (negative means KB)
+      this.db.pragma('temp_store = MEMORY'); // Store temp tables in memory
+      this.db.pragma('mmap_size = 30000000000'); // 30GB memory-mapped I/O
+      this.db.pragma('page_size = 4096'); // Optimal page size for most systems
+      this.db.pragma('auto_vacuum = INCREMENTAL'); // Automatic database size management
+      
       this.initializeTables();
     } catch (error) {
       console.error('Failed to initialize database:', error);
@@ -60,6 +73,8 @@ class DatabaseService {
         chat_id INTEGER NOT NULL,
         role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
         content TEXT NOT NULL,
+        canceled BOOLEAN NOT NULL DEFAULT 0,
+        errored BOOLEAN NOT NULL DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (chat_id) REFERENCES chats (id) ON DELETE CASCADE
       )
@@ -178,11 +193,25 @@ class DatabaseService {
     return result.count;
   }
 
-  updateMessage(id, content) {
+  updateMessage(id, content, canceled = false) {
     const stmt = this.db.prepare(`
-      UPDATE messages SET content = ? WHERE id = ?
+      UPDATE messages SET content = ?, canceled = ? WHERE id = ?
     `);
-    stmt.run(content, id);
+    stmt.run(content, canceled ? 1 : 0, id);
+  }
+
+  cancelMessage(id) {
+    const stmt = this.db.prepare(`
+      UPDATE messages SET canceled = ? WHERE id = ?
+    `);
+    stmt.run(1, id);
+  }
+
+  errorMessage(id) {
+    const stmt = this.db.prepare(`
+      UPDATE messages SET errored = ? WHERE id = ?
+    `);
+    stmt.run(1, id);
   }
 
   deleteMessage(id) {

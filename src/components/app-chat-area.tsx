@@ -32,6 +32,7 @@ const formatMessageTime = (timestamp: string) => {
 interface AppChatAreaProps {
   messages: Message[];
   isLoading: boolean;
+  selectedModel: string | null;
   handleScroll: (event: React.UIEvent<HTMLDivElement>) => void;
   onRegenerateResponse?: (messageId: number) => void;
 }
@@ -39,6 +40,7 @@ interface AppChatAreaProps {
 export function AppChatArea({
   messages,
   isLoading,
+  selectedModel,
   handleScroll,
   onRegenerateResponse,
 }: AppChatAreaProps) {
@@ -114,6 +116,21 @@ export function AppChatArea({
     }
   };
 
+  const isCancledMessage = (msg: Message): boolean => {
+    if (typeof msg.canceled === "boolean") {
+      return msg.canceled;
+    }
+    return false;
+  }
+
+  const isErrorMessage = (msg: Message): boolean => {
+    if (typeof msg.errored === "boolean") {
+      return msg.errored;
+    }
+    return false;
+  }
+
+
   return (
     <div className="relative flex-1 flex flex-col min-h-0">
       <div
@@ -182,6 +199,24 @@ export function AppChatArea({
                       )}
                   </div>
                   
+                  {/* Cancellation indicator */}
+                  {isCancledMessage(msg) && (
+                    <div className={`text-xs text-muted-foreground italic ${
+                      msg.role === "user" ? "text-right" : "text-left"
+                    }`}>
+                      Request canceled by user
+                    </div>
+                  )}
+
+                  {/* Error indicator */}
+                  {isErrorMessage(msg) && (
+                    <div className={`text-xs text-muted-foreground italic ${
+                      msg.role === "user" ? "text-right" : "text-left"
+                    }`}>
+                      Sorry, I encountered an error.
+                    </div>
+                  )}
+                  
                   {/* Action buttons - only show when hovering and message has content */}
                   {msg.content && (
                     <div className={`flex gap-1 items-center opacity-0 group-hover:opacity-100 transition-opacity ${
@@ -201,6 +236,7 @@ export function AppChatArea({
                       </Button>
                       {msg.role === "assistant" && onRegenerateResponse && (
                         <Button
+                          hidden={isLoading || !selectedModel || selectedModel.trim() === ""}
                           onClick={() => onRegenerateResponse(msg.id)}
                           variant="ghost"
                           size="sm"

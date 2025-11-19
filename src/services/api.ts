@@ -11,12 +11,21 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   created_at: string;
+  canceled?: boolean;
+  errored?: boolean;
 }
 
 export interface ChatMessagesResponse {
   messages: Message[];
   total: number;
   hasMore: boolean;
+}
+
+export interface OllamaModel {
+  name: string
+  model: string
+  modified_at: string
+  size: number
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -67,13 +76,27 @@ class ApiService {
     return response.json();
   }
 
-  async updateMessage(messageId: number, content: string): Promise<void> {
+  async updateMessage(messageId: number, content: string, canceled: boolean = false): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/messages/${messageId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content })
+      body: JSON.stringify({ content, canceled })
     });
     if (!response.ok) throw new Error('Failed to update message');
+  }
+
+  async cancelMessageGeneration(messageId: number): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/messages/${messageId}/cancel`, {
+      method: 'PATCH'
+    });
+    if (!response.ok) throw new Error('Failed to cancel message generation');
+  }
+
+  async setMessageAsError(messageId: number): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/messages/${messageId}/error`, {
+      method: 'PATCH'
+    });
+    if (!response.ok) throw new Error('Failed to mark message as error');
   }
 
   async deleteMessage(messageId: number): Promise<void> {
@@ -114,6 +137,12 @@ class ApiService {
     if (!response.ok) throw new Error('Failed to get conversation context');
     const data = await response.json();
     return data.contextMessages;
+  }
+
+  async getTags(): Promise<OllamaModel[]> {
+    const response = await fetch(`${API_BASE_URL}/tags`);
+    if (!response.ok) throw new Error('Failed to fetch tags');
+    return response.json();
   }
 }
 

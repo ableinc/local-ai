@@ -14,9 +14,7 @@ export function AppModelStatusIndicator({
     <button
       onClick={checkHealth}
       className="flex items-center gap-1 ml-2 px-2 py-1 rounded hover:bg-muted transition-colors"
-      title={`Server: ${healthStatus.server ? "Online" : "Offline"}, Ollama: ${
-        healthStatus.ollama ? "Online" : "Offline"
-      }. Click to refresh.`}
+      title={`Server: ${healthStatus.server ? "Online" : "Offline"}. Click to refresh.`}
     >
       <div
         className={`w-2 h-2 rounded-full ${

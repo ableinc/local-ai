@@ -20,6 +20,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [settings, setSettings] = useState<AppSettings>({
     use_memory: false,
   });
+  const [didNotify, setDidNotify] = useState<boolean>(false);
 
   const checkHealth = async () => {
     try {
@@ -42,13 +43,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         });
 
         // Show error toast if either service is down
-        if (!data.server || !data.ollama) {
-          toast.error("Ollama and/or server is offline", {
-            description: `Server: ${
-              data.server ? "Online" : "Offline"
-            }, Ollama: ${data.ollama ? "Online" : "Offline"}`,
-            duration: 5000,
+        if ((!data.server || !data.ollama) && !didNotify) {
+          toast.error("Server and/or Ollama", {
+            description: `Server and/or Ollama is offline.`,
+            duration: 3000,
           });
+          setDidNotify(true);
         }
       } else {
         // Server is not responding
@@ -57,11 +57,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           ollama: false,
           lastChecked: new Date(),
         });
-
-        toast.error("Ollama and/or server is offline", {
-          description: "Unable to connect to the server",
-          duration: 5000,
-        });
       }
     } catch (error) {
       console.error("Health check failed:", error);
@@ -69,11 +64,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         server: false,
         ollama: false,
         lastChecked: new Date(),
-      });
-
-      toast.error("Ollama and/or server is offline", {
-        description: "Connection failed",
-        duration: 5000,
       });
     }
   };
@@ -92,18 +82,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       const data = await response.json();
       if (response.ok) {
         setSettings(data.data);
-      } else {
-        toast.error("App Settings Error", {
-          description: data.error,
-          duration: 5000,
-        });
       }
     } catch (error) {
       console.error(error);
-      toast.error("App Settings Error", {
-        description: "Unable to get app settings, server my be offline.",
-        duration: 5000,
-      });
     }
   };
 

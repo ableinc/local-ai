@@ -28,6 +28,15 @@ const embeddingModelName = process.env.VITE_EMBEDDING_MODEL_NAME;
 app.use(cors());
 app.use(express.json());
 
+function killCurrentProcess() {
+  try {
+    process.kill(process.pid, 'SIGHUP')
+    process.exit(0)
+  } catch (err) {
+    console.log('some error happened when killing server process: ', err)
+  }
+}
+
 // Serve the frontend
 if (!isDev) {
   app.use('/', express.static(resolveResourcePath('/')));
@@ -117,6 +126,29 @@ app.get('/api/embeddings', async (req, res) => {
   }
 });
 
+app.get('/api/tags', async (req, res) => {
+  let tags = [];
+  try {
+    const response = await fetch(`${ollamaApiUrl}/api/tags`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+    if (response.ok) {
+      const data = await response.json()
+      data.models = Array.isArray(data.models) ? data.models.filter((model) => !model.name.includes('nomic-embed')) : [];
+      if (data.models.length > 0) {
+        tags = data.models
+      }
+    }
+    res.json(tags)
+  } catch (error) {
+    console.error('Error fetching tags:', error);
+    res.status(500).json({ error: 'Failed to fetch tags' });
+  }
+})
+
 // Chat endpoints
 app.get('/api/chats', (req, res) => {
   try {
@@ -178,7 +210,12 @@ app.get('/api/chats/:id/messages', (req, res) => {
     const total = dbService.getChatMessageCount(chatId);
     
     res.json({
-      messages,
+      messages: messages.map(msg => ({
+        ...msg,
+        // Ensure boolean values for canceled and errored
+        canceled: Boolean(msg.canceled),
+        errored: Boolean(msg.errored)
+      })),
       total,
       hasMore: offset + messages.length < total
     });
@@ -202,9 +239,31 @@ app.post('/api/chats/:id/messages', (req, res) => {
 app.put('/api/messages/:id', (req, res) => {
   try {
     const messageId = parseInt(req.params.id);
-    const { content } = req.body;
+    const { content, canceled } = req.body;
     
-    dbService.updateMessage(messageId, content);
+    dbService.updateMessage(messageId, content, canceled);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/messages/:id/cancel', (req, res) => {
+  try {
+    const messageId = parseInt(req.params.id);
+    
+    dbService.cancelMessage(messageId);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/messages/:id/error', (req, res) => {
+  try {
+    const messageId = parseInt(req.params.id);
+    
+    dbService.errorMessage(messageId);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -353,7 +412,6 @@ app.get('/api/debug/embedding-model', async (req, res) => {
       allModels: data.models?.map(m => m.name) || []
     });
   } catch (error) {
-    console.error('Error checking embedding model:', error);
     res.status(500).json({ error: 'Failed to check embedding model' });
   }
 });
@@ -395,13 +453,13 @@ process.on('uncaughtException', (error) => {
 process.on('SIGINT', () => {
   console.log('Received SIGINT, shutting down gracefully...');
   dbService.close();
-  process.exit(0);
+  killCurrentProcess()
 });
 
 process.on('SIGTERM', () => {
   console.log('Received SIGTERM, shutting down gracefully...');
   dbService.close();
-  process.exit(0);
+  killCurrentProcess()
 });
 
 app.listen(PORT, () => {

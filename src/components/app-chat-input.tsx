@@ -14,6 +14,24 @@ interface AppChatInputProps {
   uploadedFiles: UploadedFile[];
   setUploadedFiles: React.Dispatch<React.SetStateAction<UploadedFile[]>>;
   useMemory: boolean;
+  selectedModel: string | null;
+}
+
+function getButtonText(
+  isLoading: boolean,
+  healthStatus: HealthStatus,
+  selectedModel: string | null
+): [string, boolean] {
+  if (isLoading) {
+    return ["Cancel", false];
+  }
+  if (!healthStatus.server || !healthStatus.ollama) {
+    return ["Offline", true];
+  }
+  if (selectedModel && selectedModel.trim() !== "") {
+    return ["Send", false];
+  }
+  return ["Select a model...", true];
 }
 
 export function AppChatInput({
@@ -28,7 +46,13 @@ export function AppChatInput({
   uploadedFiles,
   setUploadedFiles,
   useMemory,
+  selectedModel,
 }: AppChatInputProps) {
+  const [buttonText, buttonDisabled] = getButtonText(
+    isLoading,
+    healthStatus,
+    selectedModel
+  );
   return (
     <div className="border-t bg-background p-4 shrink-0">
       {/* File Upload Section */}
@@ -53,21 +77,11 @@ export function AppChatInput({
         />
         <Button
           onClick={isLoading ? handleCancelGeneration : handleSendMessage}
-          disabled={
-            !isLoading && (
-              !message.trim() || 
-              !healthStatus.server || 
-              !healthStatus.ollama
-            )
-          }
+          disabled={buttonDisabled}
           variant={isLoading ? "destructive" : "default"}
           className="self-end"
         >
-          {isLoading
-            ? "Cancel"
-            : healthStatus.server && healthStatus.ollama
-            ? "Send"
-            : "Offline"}
+          {buttonText}
         </Button>
       </div>
       { useMemory === false && (
