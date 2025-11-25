@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { dbService } from './database-service.js';
+import { installOllamaEmbeddingModelIfNeeded } from './utils.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
@@ -462,13 +463,15 @@ process.on('SIGTERM', () => {
   killCurrentProcess()
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Ollama GUI Chat (${process.env.NODE_ENV}) is running at http://localhost:${PORT}`);
   console.log(`Using embedding model: ${embeddingModelName}`);
   console.log(`Database service initialized: ${dbService ? 'SUCCESS' : 'FAILED'}`);
   
   // Test database connection
   try {
+    console.log('Checking if necessary embedding model is available...');
+    await installOllamaEmbeddingModelIfNeeded();
     const chats = dbService.getAllChats();
     console.log(`Database connection test: Found ${chats.length} chats`);
   } catch (error) {

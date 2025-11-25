@@ -3,21 +3,23 @@ import {
   SidebarProvider,
   SidebarTrigger,
   SidebarInset,
-} from "./components/ui/sidebar";
-import { AppSidebar } from "./components/app-sidebar";
-import { AppChatInput } from "./components/app-chat-input";
-import { AppChatArea } from "./components/app-chat-area";
-import { AppModelDropdown } from "./components/app-model-dropdown";
-import { AppModelExportBtn } from "./components/app-model-export-btn";
-import { Separator } from "./components/ui/separator";
-import { apiService, type Chat, type Message } from "./services/api";
-import { useApp } from "./hooks/useApp";
-import type { UploadedFile } from "./components/app-file-upload";
+} from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/app-sidebar";
+import { AppChatInput } from "@/components/app-chat-input";
+import { AppChatArea } from "@/components/app-chat-area";
+import { AppModelDropdown } from "@/components/app-model-dropdown";
+import { AppModeDropdown } from "@/components/app-mode-dropdown";
+import type { AppMode } from "@/components/app-mode-dropdown";
+import { AppModelExportBtn } from "@/components/app-model-export-btn";
+import { apiService, type Chat, type Message } from "@/services/api";
+import { useApp } from "@/hooks/useApp";
+import type { UploadedFile } from "@/components/app-file-upload";
 import "highlight.js/styles/github-dark.css";
-import "./App.css";
-import { AppModelStatusIndicator } from "./components/app-model-status-indicator";
+import "@/App.css";
+import { AppModelStatusIndicator } from "@/components/app-model-status-indicator";
 import { toast } from "sonner";
-import type { OllamaModel } from "./services/api";
+import { getModes } from "@/utils";
+import type { OllamaModel } from "@/utils";
 
 function App() {
   const { healthStatus, checkHealth, settings } = useApp();
@@ -34,6 +36,7 @@ function App() {
   const [abortController, setAbortController] =
     useState<AbortController | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [appMode, setAppMode] = useState<AppMode>('Chat');
 
   const ollamaBaseUrl = import.meta.env.VITE_OLLAMA_BASE_URL;
 
@@ -631,6 +634,12 @@ function App() {
             checkHealth={checkHealth}
           />
 
+          <AppModeDropdown
+            modes={getModes(settings?.agentic_mode)}
+            currentMode={appMode}
+            setAppMode={setAppMode}
+          />
+
           {/* Model Selection Dropdown */}
           <AppModelDropdown
             availableModels={availableModels}
@@ -642,7 +651,6 @@ function App() {
           {/* Export Chat Button */}
           {currentChatId && messages.length > 0 && (
             <>
-              <Separator orientation="vertical" className="mx-2 h-4" />
               <AppModelExportBtn exportChat={exportChat} />
             </>
           )}

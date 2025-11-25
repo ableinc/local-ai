@@ -1,3 +1,5 @@
+import { getApiBaseUrl } from "@/utils";
+import type { OllamaModel } from "@/utils";
 export interface Chat {
   id: number;
   title: string;
@@ -21,14 +23,7 @@ export interface ChatMessagesResponse {
   hasMore: boolean;
 }
 
-export interface OllamaModel {
-  name: string
-  model: string
-  modified_at: string
-  size: number
-}
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = getApiBaseUrl();
 
 class ApiService {
   async getAllChats(): Promise<Chat[]> {

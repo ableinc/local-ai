@@ -104,7 +104,9 @@ class DatabaseService {
     // Insert default app settings if they don't exist
     this.db.exec(`
       INSERT OR IGNORE INTO app_settings (title, toggle, disabled) VALUES
-      ('use_memory', 1, 0)
+      ('use_memory', 1, 0);
+      INSERT OR IGNORE INTO app_settings (title, toggle, disabled) VALUES
+      ('agentic_mode', 0, 0);
     `);
 
     // Create indexes for better performance

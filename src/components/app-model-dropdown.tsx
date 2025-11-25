@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import { Select } from "./ui/select";
+import { Select } from "@/components/ui/select";
 
 interface AppModelDropdownProps {
   availableModels: { name: string }[];

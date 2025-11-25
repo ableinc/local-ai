@@ -8,6 +8,7 @@ export interface HealthStatus {
 
 export interface AppSettings {
   use_memory: boolean;
+  agentic_mode: boolean;
 }
 
 export interface AppContextType {

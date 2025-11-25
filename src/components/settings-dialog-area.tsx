@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import type { AppSettings } from "@/contexts/AppContextTypes";
 import { useState } from "react";
 import { Loader } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 
 
 interface SettingsProps {
@@ -28,7 +29,8 @@ export function SettingsDialogArea({ onClose }: SettingsProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <Label className="font-bold text-md">Use Context Memory</Label>
+        { /* Use Context Memory Setting */ }
+        <Label className="font-bold text-md">Use Memory</Label>
         <Switch checked={updatedSettings.use_memory || false} onCheckedChange={(checked: boolean) => {
           setDidChange(true);
           setUpdatedSettings((prevState) => {
@@ -38,7 +40,22 @@ export function SettingsDialogArea({ onClose }: SettingsProps) {
             }
           })
         }}/>
+
+        <Label className="font-bold text-md">Enable Agentic Mode</Label>
+        <Switch checked={updatedSettings.agentic_mode || false} onCheckedChange={(checked: boolean) => {
+          setDidChange(true);
+          setUpdatedSettings((prevState) => {
+            return {
+              ...prevState,
+              agentic_mode: checked
+            }
+          })
+        }}/>
       </div>
+
+      <Separator />
+
+      <Label className="font-bold text-md">MCP Servers</Label>
 
       <div className="flex justify-end space-x-2">
         <Button variant="outline" onClick={onClose}>

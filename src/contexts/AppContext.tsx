@@ -6,10 +6,13 @@ import {
   type AppContextType,
   type HealthStatus,
 } from "./AppContextTypes";
+import { getApiBaseUrl } from "@/utils";
 
 interface AppProviderProps {
   children: React.ReactNode;
 }
+
+const apiBaseUrl = getApiBaseUrl();
 
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [healthStatus, setHealthStatus] = useState<HealthStatus>({
@@ -19,13 +22,14 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   });
   const [settings, setSettings] = useState<AppSettings>({
     use_memory: false,
+    agentic_mode: false,
   });
   const [didNotify, setDidNotify] = useState<boolean>(false);
 
   const checkHealth = async () => {
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/health`,
+        `${apiBaseUrl}/health`,
         {
           method: "GET",
           headers: {
@@ -71,7 +75,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const getAppSettings = async () => {
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/settings`,
+        `${apiBaseUrl}/settings`,
         {
           method: "GET",
           headers: {
@@ -91,7 +95,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const saveSettings = async (newSettings: AppSettings) => {
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/settings`,
+        `${apiBaseUrl}/settings`,
         {
           method: "PUT",
           headers: {

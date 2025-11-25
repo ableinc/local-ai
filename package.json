@@ -13,6 +13,7 @@
     "dev:full": "concurrently \"bun run dev:server\" \"bun run dev\"",
     "build": "NODE_ENV=production tsc -b && vite build",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "preview": "vite preview",
     "clean": "rm -rf dist/ release/",
     "clean:hard": "rm -rf dist/ release/ node_modules/ build/index.js build/index.js.map",
@@ -102,6 +103,7 @@
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.14",
+    "@radix-ui/react-collapsible": "^1.1.12",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-separator": "^1.1.7",
