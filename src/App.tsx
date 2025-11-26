@@ -665,6 +665,19 @@ function App() {
             handleScroll={handleScroll}
             selectedModel={selectedModel}
             onRegenerateResponse={handleRegenerateResponse}
+            deleteMessage={(messageId: number) => {
+              apiService.deleteMessage(messageId).then(() => {
+                setMessages((prev) =>
+                  prev.filter((msg) => msg.id !== messageId)
+                );
+              }).catch((error) => {
+                console.error("Failed to delete message:", error);
+                toast.error("Something went wrong", {
+                  description: "Unable to delete the message",
+                  duration: 2000,
+                });
+              });
+            }}
           />
 
           {/* Input Area */}

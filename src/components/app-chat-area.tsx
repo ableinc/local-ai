@@ -3,9 +3,19 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { useRef, useEffect, useState } from "react";
 import { Button } from "./ui/button";
-import { ChevronDown, Copy, RotateCcw } from "lucide-react";
+import { ChevronDown, Copy, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Message } from "@/services/api";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Format timestamp for display
 const formatMessageTime = (timestamp: string) => {
@@ -35,6 +45,7 @@ interface AppChatAreaProps {
   selectedModel: string | null;
   handleScroll: (event: React.UIEvent<HTMLDivElement>) => void;
   onRegenerateResponse?: (messageId: number) => void;
+  deleteMessage: (messageId: number) => void;
 }
 
 export function AppChatArea({
@@ -43,10 +54,13 @@ export function AppChatArea({
   selectedModel,
   handleScroll,
   onRegenerateResponse,
+  deleteMessage
 }: AppChatAreaProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isNearBottom, setIsNearBottom] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [messageToDelete, setMessageToDelete] = useState<Message | null>(null);
 
   // Copy message to clipboard
   const copyToClipboard = async (content: string) => {
@@ -130,7 +144,6 @@ export function AppChatArea({
     return false;
   }
 
-
   return (
     <div className="relative flex-1 flex flex-col min-h-0">
       <div
@@ -186,7 +199,8 @@ export function AppChatArea({
                     )}
                     {msg.role === "assistant" &&
                       msg.content === "" &&
-                      isLoading && (
+                      isLoading &&
+                      msg.id === messages[messages.length - 1]?.id && (
                         <div className="flex items-center space-x-1">
                           <div className="w-2 h-2 bg-current rounded-full animate-bounce"></div>
                           <div
@@ -246,6 +260,18 @@ export function AppChatArea({
                           Regenerate
                         </Button>
                       )}
+                      <Button
+                        onClick={() => {
+                          setMessageToDelete(msg);
+                          setDeleteDialogOpen(true);
+                        }}
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                      >
+                        <Trash2 className="h-3 w-3 mr-1" />
+                        Delete
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -267,6 +293,28 @@ export function AppChatArea({
             <ChevronDown className="h-4 w-4" />
           </Button>
         </div>
+      )}
+      {deleteDialogOpen && (
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this message. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-500 text-white" onClick={() => {
+              if (messageToDelete) {
+                deleteMessage(messageToDelete.id);
+              }
+              setDeleteDialogOpen(false);
+              setMessageToDelete(null);
+            }}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       )}
     </div>
   );

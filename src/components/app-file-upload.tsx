@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { Paperclip, X, File, Image, FileText } from 'lucide-react';
 import { toast } from 'sonner';
-import { FileProcessor } from './file-processor';
+import { FileProcessor } from '../lib/file-processor';
 
 export interface UploadedFile {
   name: string;
