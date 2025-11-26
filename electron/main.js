@@ -46,7 +46,8 @@ function startExpressServer() {
     serverProcess = spawn(nodePath, [serverPath], {
       env,
       stdio: ['pipe', 'pipe', 'pipe'],
-      windowsHide: true
+      windowsHide: true,
+      detached: false // Ensure child process is tied to parent
     });
 
     serverProcess.stdout.on('data', (data) => {
@@ -63,9 +64,32 @@ function startExpressServer() {
 
     serverProcess.on('close', (code) => {
       console.log(`Express server exited with code ${code}`);
+      serverProcess = null;
     });
   } catch (error) {
     console.error('Failed to spawn server process:', error);
+  }
+}
+
+function killServer() {
+  if (serverProcess) {
+    console.log('Killing server process...');
+    try {
+      // Send SIGTERM for graceful shutdown
+      serverProcess.kill('SIGTERM');
+      
+      // Force kill if still alive after 3 seconds
+      setTimeout(() => {
+        if (serverProcess && !serverProcess.killed) {
+          console.log('Force killing server process...');
+          serverProcess.kill('SIGKILL');
+          serverProcess = null;
+        }
+      }, 3000);
+    } catch (error) {
+      console.error('Error killing server process:', error);
+      serverProcess = null;
+    }
   }
 }
 
@@ -164,11 +188,18 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  if (serverProcess) {
-    serverProcess.kill();
-    serverProcess = null;
-  }
+  killServer();
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('before-quit', (event) => {
+  console.log('App is quitting, cleaning up...');
+  killServer();
+});
+
+app.on('will-quit', (event) => {
+  console.log('App will quit, ensuring server is killed...');
+  killServer();
 });
 
 app.on('activate', async () => {
@@ -181,4 +212,17 @@ app.on('activate', async () => {
     }
     createWindow();
   }
+});
+
+// Handle SIGINT and SIGTERM
+process.on('SIGINT', () => {
+  console.log('Received SIGINT, cleaning up...');
+  killServer();
+  app.quit();
+});
+
+process.on('SIGTERM', () => {
+  console.log('Received SIGTERM, cleaning up...');
+  killServer();
+  app.quit();
 });
