@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { AppSettings } from "@/contexts/AppContextTypes";
 import { useState } from "react";
-import { ChevronsUpDown, Loader, Plus } from "lucide-react";
+import { ChevronsUpDown, Loader, Plus, RotateCcw, X as CloseIcon } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { AppMCPServers } from "@/components/app-mcp-servers";
 
@@ -13,7 +13,7 @@ interface SettingsProps {
 }
 
 export function SettingsDialogArea({ onClose }: SettingsProps) {
-  const { settings, saveSettings, mcpServers, addMcpServer, deleteMcpServer } = useApp();
+  const { settings, saveSettings, mcpServers, addMcpServer, deleteMcpServer, getMcpServers } = useApp();
   const [updatedSettings, setUpdatedSettings] = useState<AppSettings>(settings);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [didChange, setDidChange] = useState<boolean>(false);
@@ -44,7 +44,7 @@ export function SettingsDialogArea({ onClose }: SettingsProps) {
         }}/>
 
         <Label className="font-bold text-md">Enable Agentic Mode</Label>
-        <Switch disabled={true} checked={updatedSettings.agentic_mode || false} onCheckedChange={(checked: boolean) => {
+        <Switch checked={updatedSettings.agentic_mode || false} onCheckedChange={(checked: boolean) => {
           setDidChange(true);
           setUpdatedSettings((prevState) => {
             return {
@@ -57,24 +57,37 @@ export function SettingsDialogArea({ onClose }: SettingsProps) {
 
       <Separator />
       <div className="flex items-center justify-between">
-        <Label className="font-bold text-md">MCP Servers ({mcpServers.length})</Label>
-          <div className="flex items-center justify-between">
-            <Button variant="ghost" size="icon" className="size-8 cursor-pointer" onClick={() => {
+        <div className="flex items-center justify-between">
+          <Label className="font-bold text-md">MCP Servers ({mcpServers.length})</Label>
+          <Button variant="ghost" size="icon" className="size-8 cursor-pointer" onClick={() => {
+            getMcpServers();
+          }}>
+            <RotateCcw />
+          <span className="sr-only">Refresh MCP Server List</span>
+          </Button>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <Button variant="ghost" size="icon" className="size-8 cursor-pointer" onClick={() => {
+            if (doCreateNew) {
+              setDoCreateNew(false);
+              getMcpServers();
+            } else {
               setDoCreateNew(true);
               setIsMCPServersOpen(true);
-            }}>
-              <Plus />
-              <span className="sr-only">Add MCP Server</span>
-            </Button>
+            }
+          }}>
+            { doCreateNew ? <CloseIcon /> : <Plus /> }
+            <span className="sr-only">Add MCP Server</span>
+          </Button>
 
-            <Button variant="ghost" size="icon" className="size-8" onClick={() => {
-              setDoCreateNew(false);
-              setIsMCPServersOpen(prev => !prev)
-            }}>
+          <Button variant="ghost" size="icon" className="size-8" onClick={() => {
+            setIsMCPServersOpen(prev => !prev)
+          }}>
               <ChevronsUpDown />
               <span className="sr-only">Toggle</span>
-            </Button>
-          </div>
+          </Button>
+        </div>
       </div>
       
       <AppMCPServers

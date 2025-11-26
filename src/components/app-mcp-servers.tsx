@@ -72,13 +72,13 @@ function McpServersTable({ mcpServers, deleteFunc }: McpServersTableProps) {
       <Table>
         <TableCaption>A list of your MCP servers</TableCaption>
         <TableHeader>
-          <TableRow>
+          <TableRow key={"header"}>
             <TableHead className="w-[100px]">Name</TableHead>
             <TableHead>URL</TableHead>
             <TableHead className="text-right">Delete</TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody>
+        <TableBody key={"body"}>
           {mcpServers.map((server) => (
             <TableRow key={server.id}>
               <TableCell className="font-medium">{server.name}</TableCell>
@@ -107,7 +107,7 @@ function McpServersTable({ mcpServers, deleteFunc }: McpServersTableProps) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete}>Delete</AlertDialogAction>
+            <AlertDialogAction className="bg-red-500 text-white" onClick={handleConfirmDelete}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
