@@ -6,13 +6,11 @@ import {
   type AppContextType,
   type HealthStatus,
 } from "./AppContextTypes";
-import { getApiBaseUrl } from "@/utils";
+import { apiService, type McpServer } from "@/services/api";
 
 interface AppProviderProps {
   children: React.ReactNode;
 }
-
-const apiBaseUrl = getApiBaseUrl();
 
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [healthStatus, setHealthStatus] = useState<HealthStatus>({
@@ -24,43 +22,23 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     use_memory: false,
     agentic_mode: false,
   });
+  const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
   const [didNotify, setDidNotify] = useState<boolean>(false);
 
   const checkHealth = async () => {
     try {
-      const response = await fetch(
-        `${apiBaseUrl}/health`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setHealthStatus({
-          server: data.server,
-          ollama: data.ollama,
-          lastChecked: new Date(),
+      const response = await apiService.checkHealth();
+      setHealthStatus({
+        server: response.server,
+        ollama: response.ollama,
+        lastChecked: new Date(),
+      });
+      if ((!response.server || !response.ollama) && !didNotify) {
+        toast.error("Server and/or Ollama", {
+          description: `Server and/or Ollama is offline.`,
+          duration: 3000,
         });
-
-        // Show error toast if either service is down
-        if ((!data.server || !data.ollama) && !didNotify) {
-          toast.error("Server and/or Ollama", {
-            description: `Server and/or Ollama is offline.`,
-            duration: 3000,
-          });
-          setDidNotify(true);
-        }
-      } else {
-        // Server is not responding
-        setHealthStatus({
-          server: false,
-          ollama: false,
-          lastChecked: new Date(),
-        });
+        setDidNotify(true);
       }
     } catch (error) {
       console.error("Health check failed:", error);
@@ -74,19 +52,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
   const getAppSettings = async () => {
     try {
-      const response = await fetch(
-        `${apiBaseUrl}/settings`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      const data = await response.json();
-      if (response.ok) {
-        setSettings(data.data);
-      }
+      const response = await apiService.getAppSettings();
+      setSettings(response);
     } catch (error) {
       console.error(error);
     }
@@ -94,40 +61,60 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
   const saveSettings = async (newSettings: AppSettings) => {
     try {
-      const response = await fetch(
-        `${apiBaseUrl}/settings`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(newSettings)
-        }
-      );
-      const data = await response.json();
-      if (response.ok) {
-        setSettings(data.data);
-      } else {
-        toast.error("Updating Settings Error", {
-          description: data.error,
-          duration: 5000,
-        });
-      }
-      // Get latest settings
-      await getAppSettings();
+      const response = await apiService.saveAppSettings(newSettings);
+      setSettings(response);
     } catch (error) {
       console.error(error);
       toast.error("Updating Settings Error", {
         description: "Unable to update settings. Please try again later.",
         duration: 5000,
       });
-    } 
+    }
   }
+
+  const addMcpServer = async (body: McpServer): Promise<void> => {
+    try {
+      const newServer = await apiService.addMcpServer(body);
+      toast.success("MCP Server added successfully");
+      setMcpServers((prevServers) => [...prevServers, newServer]);
+    } catch (error) {
+      console.error("Failed to add MCP server:", error);
+      toast.error("Failed to add MCP server", {
+        duration: 5000,
+      });
+    }
+  };
+
+  const deleteMcpServer = async (id: number) => {
+    try {
+      await apiService.deleteMcpServer(id);
+      toast.success("MCP Server deleted successfully");
+      setMcpServers((prevServers) => prevServers.filter(server => server.id !== id));
+    } catch (error) {
+      console.error("Failed to delete MCP server:", error);
+      toast.error("Failed to delete MCP server", {
+        duration: 5000,
+      });
+    }
+  };
+
+  const getMcpServers = async (): Promise<void> => {
+    try {
+      const servers = await apiService.getMcpServers();
+      setMcpServers(servers);
+    } catch (error) {
+      console.error("Failed to fetch MCP servers:", error);
+      toast.error("Failed to fetch MCP servers", {
+        duration: 5000,
+      });
+    }
+  };
 
   // Check health on mount and periodically
   useEffect(() => {
     checkHealth();
     getAppSettings();
+    getMcpServers();
     // Check health every 5 seconds
     const interval = setInterval(checkHealth, 5000);
 
@@ -139,6 +126,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     checkHealth,
     settings,
     saveSettings,
+    mcpServers,
+    addMcpServer,
+    deleteMcpServer,
+    getMcpServers,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

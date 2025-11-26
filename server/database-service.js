@@ -101,6 +101,16 @@ class DatabaseService {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    // Create MCP servers table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS mcp_servers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL,
+        api_key TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
     // Insert default app settings if they don't exist
     this.db.exec(`
       INSERT OR IGNORE INTO app_settings (title, toggle, disabled) VALUES
@@ -337,6 +347,35 @@ class DatabaseService {
     return similarities
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, topK);
+  }
+
+  // MCP Servers operations
+  addMCPServer(name, url, apiKey) {
+    const stmt = this.db.prepare(`
+      INSERT INTO mcp_servers (name, url, api_key) VALUES (?, ?, ?)
+    `);
+    return stmt.run(name, url, apiKey);
+  }
+
+  getMCPServers() {
+    const stmt = this.db.prepare(`
+      SELECT * FROM mcp_servers ORDER BY created_at DESC
+    `);
+    return stmt.all();
+  }
+
+  updateMCPServer(id, name, url, apiKey) {
+    const stmt = this.db.prepare(`
+      UPDATE mcp_servers SET name = ?, url = ?, api_key = ? WHERE id = ?
+    `);
+    return stmt.run(name, url, apiKey, id);
+  }
+
+  deleteMCPServer(id) {
+    const stmt = this.db.prepare(`
+      DELETE FROM mcp_servers WHERE id = ?
+    `);
+    return stmt.run(id);
   }
 
   close() {

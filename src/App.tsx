@@ -18,8 +18,8 @@ import "highlight.js/styles/github-dark.css";
 import "@/App.css";
 import { AppModelStatusIndicator } from "@/components/app-model-status-indicator";
 import { toast } from "sonner";
-import { getModes } from "@/utils";
-import type { OllamaModel } from "@/utils";
+import { getModes } from "@/lib/utils";
+import type { OllamaModel } from "@/lib/utils";
 
 function App() {
   const { healthStatus, checkHealth, settings } = useApp();

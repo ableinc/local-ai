@@ -102,12 +102,13 @@
     }
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-collapsible": "^1.1.12",
     "@radix-ui/react-dialog": "^1.1.14",
-    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-separator": "^1.1.7",
-    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-switch": "^1.2.5",
     "@radix-ui/react-tooltip": "^1.2.7",
     "@types/better-sqlite3": "^7.6.13",
@@ -124,11 +125,13 @@
     "pdfjs-dist": "^5.3.93",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-hook-form": "^7.66.1",
     "react-markdown": "^10.1.0",
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
     "sonner": "^2.0.6",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@electron/notarize": "^2.5.0",

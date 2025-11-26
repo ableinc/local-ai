@@ -4,19 +4,21 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { AppSettings } from "@/contexts/AppContextTypes";
 import { useState } from "react";
-import { Loader } from "lucide-react";
+import { ChevronsUpDown, Loader, Plus } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-
+import { AppMCPServers } from "@/components/app-mcp-servers";
 
 interface SettingsProps {
   onClose: () => void;
 }
 
 export function SettingsDialogArea({ onClose }: SettingsProps) {
-  const { settings, saveSettings } = useApp();
+  const { settings, saveSettings, mcpServers, addMcpServer, deleteMcpServer } = useApp();
   const [updatedSettings, setUpdatedSettings] = useState<AppSettings>(settings);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [didChange, setDidChange] = useState<boolean>(false);
+  const [isMCPServersOpen, setIsMCPServersOpen] = useState<boolean>(false);
+  const [doCreateNew, setDoCreateNew] = useState<boolean>(false);
 
   if (isLoading) {
     return (
@@ -42,7 +44,7 @@ export function SettingsDialogArea({ onClose }: SettingsProps) {
         }}/>
 
         <Label className="font-bold text-md">Enable Agentic Mode</Label>
-        <Switch checked={updatedSettings.agentic_mode || false} onCheckedChange={(checked: boolean) => {
+        <Switch disabled={true} checked={updatedSettings.agentic_mode || false} onCheckedChange={(checked: boolean) => {
           setDidChange(true);
           setUpdatedSettings((prevState) => {
             return {
@@ -54,9 +56,35 @@ export function SettingsDialogArea({ onClose }: SettingsProps) {
       </div>
 
       <Separator />
+      <div className="flex items-center justify-between">
+        <Label className="font-bold text-md">MCP Servers ({mcpServers.length})</Label>
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" size="icon" className="size-8 cursor-pointer" onClick={() => {
+              setDoCreateNew(true);
+              setIsMCPServersOpen(true);
+            }}>
+              <Plus />
+              <span className="sr-only">Add MCP Server</span>
+            </Button>
 
-      <Label className="font-bold text-md">MCP Servers</Label>
-
+            <Button variant="ghost" size="icon" className="size-8" onClick={() => {
+              setDoCreateNew(false);
+              setIsMCPServersOpen(prev => !prev)
+            }}>
+              <ChevronsUpDown />
+              <span className="sr-only">Toggle</span>
+            </Button>
+          </div>
+      </div>
+      
+      <AppMCPServers
+        open={isMCPServersOpen}
+        setIsOpen={setIsMCPServersOpen}
+        mcpServers={mcpServers}
+        createNewFunc={addMcpServer}
+        doCreateNew={doCreateNew}
+        deleteFunc={deleteMcpServer}
+      />
       <div className="flex justify-end space-x-2">
         <Button variant="outline" onClick={onClose}>
           Close

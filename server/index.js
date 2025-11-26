@@ -424,7 +424,7 @@ app.get('/api/settings', async (req, res) => {
     for (const column of data) {
       result[column.title] = column.toggle === 1;
     }
-    res.json({ data: result });
+    res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -434,6 +434,46 @@ app.put('/api/settings', async (req, res) => {
   try {
     dbService.updateAppSettings(req.body);
     res.json({ message: 'success' })
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/mcp-servers', async (req, res) => {
+  try {
+    const servers = dbService.getMCPServers();
+    res.json(servers);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/mcp-servers', async (req, res) => {
+  try {
+    const { name, url, api_key } = req.body;
+    const server = dbService.addMCPServer(name, url, api_key);
+    res.json(server);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/mcp-servers/:id', async (req, res) => {
+  try {
+    const serverId = parseInt(req.params.id);
+    dbService.deleteMCPServer(serverId);
+    res.json({ message: 'success' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/mcp-servers/:id', async (req, res) => {
+  try {
+    const serverId = parseInt(req.params.id);
+    const { name, url, api_key } = req.body;
+    dbService.updateMCPServer(serverId, name, url, api_key);
+    res.json({ message: 'success' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

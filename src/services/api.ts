@@ -1,5 +1,6 @@
-import { getApiBaseUrl } from "@/utils";
-import type { OllamaModel } from "@/utils";
+import type { AppSettings } from "@/contexts/AppContextTypes";
+import { getApiBaseUrl } from "@/lib/utils";
+import type { OllamaModel } from "@/lib/utils";
 export interface Chat {
   id: number;
   title: string;
@@ -21,6 +22,14 @@ export interface ChatMessagesResponse {
   messages: Message[];
   total: number;
   hasMore: boolean;
+}
+
+export interface McpServer {
+  id: number;
+  name: string;
+  url: string;
+  api_key?: string;
+  created_at?: string;
 }
 
 const API_BASE_URL = getApiBaseUrl();
@@ -138,6 +147,57 @@ class ApiService {
     const response = await fetch(`${API_BASE_URL}/tags`);
     if (!response.ok) throw new Error('Failed to fetch tags');
     return response.json();
+  }
+
+  async checkHealth(): Promise<{ server: boolean, ollama: boolean }> {
+    const response = await fetch(`${API_BASE_URL}/health`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) throw new Error('Failed to check health');
+    return response.json();
+  }
+
+  async getAppSettings(): Promise<AppSettings> {
+    const response = await fetch(`${API_BASE_URL}/settings`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) throw new Error('Failed to fetch app settings');
+    return response.json();
+  }
+
+  async saveAppSettings(newSettings: AppSettings): Promise<AppSettings> {
+    const response = await fetch(`${API_BASE_URL}/settings`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newSettings)
+    });
+    if (!response.ok) throw new Error('Failed to save app settings');
+    return response.json();
+  }
+
+  async getMcpServers(): Promise<McpServer[]> {
+    const response = await fetch(`${API_BASE_URL}/mcp-servers`);
+    if (!response.ok) throw new Error('Failed to fetch MCP servers');
+    return response.json();
+  }
+
+  async addMcpServer(body: McpServer): Promise<McpServer> {
+    const response = await fetch(`${API_BASE_URL}/mcp-servers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) throw new Error('Failed to add MCP server');
+    return response.json();
+  }
+
+  async deleteMcpServer(id: number): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/mcp-servers/${id}`, {
+      method: 'DELETE'
+    });
+    if (!response.ok) throw new Error('Failed to delete MCP server');
   }
 }
 
