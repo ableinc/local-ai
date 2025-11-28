@@ -1,5 +1,5 @@
 import { createContext } from 'react'
-import type { McpServer } from '@/services/api';
+import type { McpServer, ErrorLog } from '@/services/api';
 
 export interface HealthStatus {
   server: boolean;
@@ -21,6 +21,7 @@ export interface AppContextType {
   addMcpServer: (body: McpServer) => Promise<void>;
   deleteMcpServer: (id: number) => Promise<void>;
   getMcpServers: () => Promise<void>;
+  appErrorLogs: ErrorLog[];
 }
 
 export const AppContext = createContext<AppContextType | undefined>(undefined)

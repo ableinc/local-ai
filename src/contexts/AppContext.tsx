@@ -6,7 +6,7 @@ import {
   type AppContextType,
   type HealthStatus,
 } from "./AppContextTypes";
-import { apiService, type McpServer } from "@/services/api";
+import { apiService, type McpServer, type ErrorLog } from "@/services/api";
 
 interface AppProviderProps {
   children: React.ReactNode;
@@ -24,6 +24,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   });
   const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
   const [didNotify, setDidNotify] = useState<boolean>(false);
+  const [appErrorLogs, setAppErrorLogs] = useState<ErrorLog[]>([]);
 
   const checkHealth = async () => {
     try {
@@ -111,6 +112,15 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   };
 
+  const getAppErrorLogs = async (): Promise<void> => {
+    try {
+      const errorLogs = await apiService.getAppErrorLogs();
+      setAppErrorLogs(errorLogs);
+    } catch (error) {
+      console.error("Failed to fetch app error logs:", error);
+    }
+  };
+
   // Check health on mount and periodically
   useEffect(() => {
     checkHealth();
@@ -118,8 +128,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     getMcpServers();
     // Check health every 5 seconds
     const interval = setInterval(checkHealth, 5000);
+    const errorLogInterval = setInterval(getAppErrorLogs, 60000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      clearInterval(errorLogInterval);
+    }
   }, []);
 
   const value: AppContextType = {
@@ -131,6 +145,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     addMcpServer,
     deleteMcpServer,
     getMcpServers,
+    appErrorLogs,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

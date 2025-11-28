@@ -32,6 +32,15 @@ export interface McpServer {
   created_at?: string;
 }
 
+export interface ErrorLog {
+  id: number | bigint;
+  error_message: string;
+  stack_trace: string;
+  has_embedding_model: boolean | number;
+  has_summary_model: boolean | number;
+  created_at: string;
+}
+
 const API_BASE_URL = getApiBaseUrl();
 
 class ApiService {
@@ -200,6 +209,12 @@ class ApiService {
       method: 'DELETE'
     });
     if (!response.ok) throw new Error('Failed to delete MCP server');
+  }
+
+  async getAppErrorLogs(): Promise<ErrorLog[]> {
+    const response = await fetch(`${API_BASE_URL}/error-logs`);
+    if (!response.ok) throw new Error('Failed to fetch error logs');
+    return (response.json() as Promise<{ data: ErrorLog[] }>).then(res => res.data);
   }
 }
 

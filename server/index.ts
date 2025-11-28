@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { dbService } from './database-service.ts';
-import type { OllamaTags, Chat, Message, MessageEmbedding, AppSetting, McpServer } from './types.ts';
+import type { OllamaTags, Chat, Message, MessageEmbedding, AppSetting, McpServer, ErrorLog } from './types.ts';
 import { installOllamaEmbeddingModelIfNeeded, installOllamaSummaryModelIfNeeded } from './utils.ts';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -469,8 +469,8 @@ app.post('/api/chat/title', async (req: express.Request, res: express.Response):
 
 app.get('/api/error-logs', async (req: express.Request, res: express.Response): Promise<void> => {
   try {
-    const logs = dbService.getErrorLogs();
-    res.json({ data: logs });
+    const errorLogs: ErrorLog[] = dbService.getErrorLogs();
+    res.json({ data: errorLogs });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
@@ -527,6 +527,12 @@ app.listen(PORT, async () => {
     }
   } catch (error) {
     console.error('Database connection test failed:', error);
+    dbService.addErrorLog(
+      (error as Error).message,
+      (error as Error).stack || '',
+      false,
+      false
+    );
   }
 }).on('error', (error) => {
   console.error('Server failed to start:', error);

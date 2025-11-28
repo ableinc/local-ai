@@ -17,7 +17,7 @@ export function AppModeDropdown({ modes, currentMode, setAppMode }: AppModeDropd
         </span>
       <Select
         value={currentMode}
-        className="w-48 cursor-pointer"
+        className="w-24 cursor-pointer"
         onChange={(e) => {
           setAppMode(e.target.value as AppMode);
         }}

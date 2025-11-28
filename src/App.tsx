@@ -21,9 +21,11 @@ import { toast } from "sonner";
 import { getModes } from "@/lib/utils";
 import type { OllamaModel } from "@/lib/utils";
 import { startConversationSession } from "./services/conversation";
+import { AppErrorAlerts } from "./components/app-error-alerts";
+import { AlertTriangle } from "lucide-react";
 
 function App() {
-  const { healthStatus, checkHealth, settings } = useApp();
+  const { healthStatus, checkHealth, settings, appErrorLogs } = useApp();
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -39,6 +41,7 @@ function App() {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [appMode, setAppMode] = useState<AppMode>('Chat');
   const [shouldRegenerateMessage, setShouldRegenerateMessage] = useState<boolean>(false);
+  const [isErrorLogsOpen, setIsErrorLogsOpen] = useState(false);
 
   const ollamaBaseUrl = import.meta.env.VITE_OLLAMA_BASE_URL;
 
@@ -423,6 +426,22 @@ function App() {
             modes={getModes(settings?.agentic_mode)}
             currentMode={appMode}
             setAppMode={setAppMode}
+          />
+
+          {appErrorLogs.length > 0 && (
+            <button
+              onClick={() => setIsErrorLogsOpen(true)}
+              className="p-2 rounded-md hover:bg-accent transition-colors cursor-pointer"
+              title="View error logs"
+            >
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+            </button>
+          )}
+
+          <AppErrorAlerts
+            errorLogs={appErrorLogs}
+            isOpen={isErrorLogsOpen}
+            onClose={() => setIsErrorLogsOpen(false)}
           />
 
           {/* Model Selection Dropdown */}
