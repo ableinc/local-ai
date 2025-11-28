@@ -1,21 +1,21 @@
 import express from 'express';
 import cors from 'cors';
-import { dbService } from './database-service.js';
-import type { OllamaTags, Chat, Message, MessageEmbedding, AppSetting, McpServer } from './types.js';
-import { installOllamaEmbeddingModelIfNeeded, installOllamaSummaryModelIfNeeded } from './utils.js';
+import { dbService } from './database-service.ts';
+import type { OllamaTags, Chat, Message, MessageEmbedding, AppSetting, McpServer } from './types.ts';
+import { installOllamaEmbeddingModelIfNeeded, installOllamaSummaryModelIfNeeded } from './utils.ts';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const isDev = process.resourcesPath === undefined;
+const isDev = (process as unknown as { resourcesPath: string }).resourcesPath === undefined;
 console.info("Running in development mode:", isDev);
 
 function resolveResourcePath(...segments: string[]): string {
   const base = isDev
     ? path.join(__dirname, '..')
-    : process.resourcesPath
+    : (process as unknown as { resourcesPath: string }).resourcesPath
   return path.join(base, ...segments)
 }
 
@@ -502,7 +502,6 @@ process.on('SIGTERM', () => {
 
 app.listen(PORT, async () => {
   console.log(`Ollama GUI Chat (${process.env.NODE_ENV}) is running at http://localhost:${PORT}`);
-  console.log(`Using embedding model: ${embeddingModelName}`);
   console.log(`Database service initialized: ${dbService ? 'SUCCESS' : 'FAILED'}`);
   
   // Test database connection
@@ -522,6 +521,9 @@ app.listen(PORT, async () => {
         hasInstalledEmbeddingModel,
         hasInstalledSummaryModel
       );
+    } else {
+      console.log(`Using embedding model: ${embeddingModelName}`);
+      console.log(`Using summarization model: ${summarizationModelName}`);
     }
   } catch (error) {
     console.error('Database connection test failed:', error);

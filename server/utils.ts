@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { OllamaTags } from './types';
+import { OllamaTags } from './types.ts';
 
 export async function installOllamaEmbeddingModelIfNeeded(): Promise<boolean> {
   const modelName = process.env.EMBEDDING_MODEL_NAME || 'nomic-embed-text';

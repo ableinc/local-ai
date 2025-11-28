@@ -78,7 +78,7 @@ export interface OllamaModel {
 }
 
 export interface OllamaTags {
-  models: Array<OllamaModel>;
+  models: OllamaModel[];
 }
 
 export interface ErrorLog {

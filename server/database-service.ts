@@ -17,7 +17,7 @@ class DatabaseService {
   constructor() {
     // Get the app data directory
     this.userDataPath = process.env.ELECTRON_APP_DATA_PATH || __dirname;
-    this.isDev = process.resourcesPath === undefined;
+    this.isDev = (process as unknown as { resourcesPath: string }).resourcesPath === undefined;
     this.db = null;
     this.electronBetterSqlite3Path = process.env.BETTER_SQLITE3_PATH || '';
     this.sqliteBinaryPath = join(this.userDataPath, 'better_sqlite3.node');
