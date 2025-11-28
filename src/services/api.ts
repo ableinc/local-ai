@@ -38,7 +38,7 @@ class ApiService {
   async getAllChats(): Promise<Chat[]> {
     const response = await fetch(`${API_BASE_URL}/chats`);
     if (!response.ok) throw new Error('Failed to fetch chats');
-    return response.json();
+    return (response.json() as Promise<{ data: Chat[] }>).then(res => res.data);
   }
 
   async createChat(title: string): Promise<Chat> {
@@ -48,13 +48,13 @@ class ApiService {
       body: JSON.stringify({ title })
     });
     if (!response.ok) throw new Error('Failed to create chat');
-    return response.json();
+    return (response.json() as Promise<{ data: Chat }>).then(res => res.data);
   }
 
   async getChatById(id: number): Promise<Chat> {
     const response = await fetch(`${API_BASE_URL}/chats/${id}`);
     if (!response.ok) throw new Error('Failed to fetch chat');
-    return response.json();
+    return (response.json() as Promise<{ data: Chat }>).then(res => res.data);
   }
 
   async deleteChat(id: number): Promise<void> {
@@ -64,10 +64,10 @@ class ApiService {
     if (!response.ok) throw new Error('Failed to delete chat');
   }
 
-  async getChatMessages(chatId: number, limit: number = 50, offset: number = 0): Promise<ChatMessagesResponse> {
-    const response = await fetch(`${API_BASE_URL}/chats/${chatId}/messages?limit=${limit}&offset=${offset}`);
+  async getChatMessages(chatId: number, pageSize: number = 50, page: number = 0): Promise<ChatMessagesResponse> {
+    const response = await fetch(`${API_BASE_URL}/chats/${chatId}/messages?pageSize=${pageSize}&page=${page}`);
     if (!response.ok) throw new Error('Failed to fetch messages');
-    return response.json();
+    return (response.json() as Promise<{ data: ChatMessagesResponse }>).then(res => res.data);
   }
 
   async addMessage(chatId: number, role: 'user' | 'assistant', content: string): Promise<Message> {
@@ -77,7 +77,7 @@ class ApiService {
       body: JSON.stringify({ role, content })
     });
     if (!response.ok) throw new Error('Failed to add message');
-    return response.json();
+    return (response.json() as Promise<{ data: Message }>).then(res => res.data);
   }
 
   async updateMessage(messageId: number, content: string, canceled: boolean = false): Promise<void> {
@@ -110,10 +110,14 @@ class ApiService {
     if (!response.ok) throw new Error('Failed to delete message');
   }
 
-  generateChatTitle(firstMessage: string): string {
-    return firstMessage.length > 50 
-      ? firstMessage.substring(0, 50) + '...' 
-      : firstMessage;
+  async generateChatTitle(message: string): Promise<string> {
+    const response = await fetch(`${API_BASE_URL}/chats/title`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message })
+    });
+    if (!response.ok) throw new Error('Failed to generate chat title');
+    return (response.json() as Promise<{ data: { title: string } }>).then(res => res.data.title);
   }
 
   async generateEmbedding(messageId: number): Promise<number[]> {
@@ -121,8 +125,7 @@ class ApiService {
       method: 'POST',
     });
     if (!response.ok) throw new Error('Failed to generate embedding');
-    const data = await response.json();
-    return data.embedding;
+    return (response.json() as Promise<{ data: number[] }>).then(res => res.data);
   }
 
   async getConversationContext(
@@ -139,23 +142,22 @@ class ApiService {
       body: JSON.stringify({ message, recentCount, similarCount })
     });
     if (!response.ok) throw new Error('Failed to get conversation context');
-    const data = await response.json();
-    return data.contextMessages;
+    return (response.json() as Promise<{ context: Message[] }>).then(res => res.context);
   }
 
   async getTags(): Promise<OllamaModel[]> {
     const response = await fetch(`${API_BASE_URL}/tags`);
     if (!response.ok) throw new Error('Failed to fetch tags');
-    return response.json();
+    return (response.json() as Promise<{ data: OllamaModel[] }>).then(res => res.data);
   }
 
-  async checkHealth(): Promise<{ server: boolean, ollama: boolean }> {
+  async checkHealth(): Promise<{ server: boolean, ollama: boolean, timestamp: string }> {
     const response = await fetch(`${API_BASE_URL}/health`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
     });
     if (!response.ok) throw new Error('Failed to check health');
-    return response.json();
+    return (response.json() as Promise<{ data: {server: boolean, ollama: boolean, timestamp: string } }>).then(res => res.data);
   }
 
   async getAppSettings(): Promise<AppSettings> {
@@ -164,7 +166,7 @@ class ApiService {
       headers: { 'Content-Type': 'application/json' },
     });
     if (!response.ok) throw new Error('Failed to fetch app settings');
-    return response.json();
+    return (response.json() as Promise<{ data: AppSettings }>).then(res => res.data);
   }
 
   async saveAppSettings(newSettings: AppSettings): Promise<AppSettings> {
@@ -174,13 +176,13 @@ class ApiService {
       body: JSON.stringify(newSettings)
     });
     if (!response.ok) throw new Error('Failed to save app settings');
-    return response.json();
+    return (response.json() as Promise<{ data: AppSettings }>).then(res => res.data);
   }
 
   async getMcpServers(): Promise<McpServer[]> {
     const response = await fetch(`${API_BASE_URL}/mcp-servers`);
     if (!response.ok) throw new Error('Failed to fetch MCP servers');
-    return response.json();
+    return (response.json() as Promise<{ data: McpServer[] }>).then(res => res.data);
   }
 
   async addMcpServer(body: McpServer): Promise<McpServer> {
@@ -190,7 +192,7 @@ class ApiService {
       body: JSON.stringify(body)
     });
     if (!response.ok) throw new Error('Failed to add MCP server');
-    return response.json();
+    return (response.json() as Promise<{ data: McpServer }>).then(res => res.data);
   }
 
   async deleteMcpServer(id: number): Promise<void> {

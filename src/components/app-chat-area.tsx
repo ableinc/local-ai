@@ -44,8 +44,10 @@ interface AppChatAreaProps {
   isLoading: boolean;
   selectedModel: string | null;
   handleScroll: (event: React.UIEvent<HTMLDivElement>) => void;
-  onRegenerateResponse?: (messageId: number) => void;
+  onRegenerateResponse: (message: Message) => void;
   deleteMessage: (messageId: number) => void;
+  setShouldRegenerateMessage: React.Dispatch<React.SetStateAction<boolean>>;
+  shouldRegenerateMessage: boolean;
 }
 
 export function AppChatArea({
@@ -54,7 +56,9 @@ export function AppChatArea({
   selectedModel,
   handleScroll,
   onRegenerateResponse,
-  deleteMessage
+  deleteMessage,
+  setShouldRegenerateMessage,
+  shouldRegenerateMessage,
 }: AppChatAreaProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -197,10 +201,14 @@ export function AppChatArea({
                         </ReactMarkdown>
                       </div>
                     )}
-                    {msg.role === "assistant" &&
+                    {(msg.role === "assistant" &&
                       msg.content === "" &&
                       isLoading &&
-                      msg.id === messages[messages.length - 1]?.id && (
+                      msg.id === messages[messages.length - 1]?.id) || (
+                      msg.role === "assistant" &&
+                      isLoading &&
+                      shouldRegenerateMessage
+                      ) && (
                         <div className="flex items-center space-x-1">
                           <div className="w-2 h-2 bg-current rounded-full animate-bounce"></div>
                           <div
@@ -251,7 +259,10 @@ export function AppChatArea({
                       {msg.role === "assistant" && onRegenerateResponse && (
                         <Button
                           hidden={isLoading || !selectedModel || selectedModel.trim() === ""}
-                          onClick={() => onRegenerateResponse(msg.id)}
+                          onClick={() => {
+                            setShouldRegenerateMessage(true);
+                            onRegenerateResponse(msg);
+                          }}
                           variant="ghost"
                           size="sm"
                           className="h-6 px-2 text-xs"

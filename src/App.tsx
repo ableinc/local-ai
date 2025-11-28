@@ -20,6 +20,7 @@ import { AppModelStatusIndicator } from "@/components/app-model-status-indicator
 import { toast } from "sonner";
 import { getModes } from "@/lib/utils";
 import type { OllamaModel } from "@/lib/utils";
+import { startConversationSession } from "./services/conversation";
 
 function App() {
   const { healthStatus, checkHealth, settings } = useApp();
@@ -37,6 +38,7 @@ function App() {
     useState<AbortController | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [appMode, setAppMode] = useState<AppMode>('Chat');
+  const [shouldRegenerateMessage, setShouldRegenerateMessage] = useState<boolean>(false);
 
   const ollamaBaseUrl = import.meta.env.VITE_OLLAMA_BASE_URL;
 
@@ -54,9 +56,9 @@ function App() {
   }, []);
 
   const loadChatMessages = useCallback(
-    async (chatId: number, offset: number = 0, reset: boolean = false) => {
+    async (chatId: number, page: number = 0, reset: boolean = false) => {
       try {
-        const response = await apiService.getChatMessages(chatId, 50, offset);
+        const response = await apiService.getChatMessages(chatId, 50, page);
 
         if (reset) {
           setMessages(response.messages);
@@ -199,193 +201,6 @@ function App() {
     [settings]
   );
 
-  const handleSendMessage = async () => {
-    if (!healthStatus.server && !healthStatus.ollama) {
-      return;
-    }
-    if (!selectedModel) {
-      toast.error("No model selected", {
-        description: "Please select a model to continue",
-        duration: 2000,
-      });
-      return;
-    }
-    if (message.trim() && !isLoading) {
-      const userMessage = message.trim();
-
-      // Include file context if there are uploaded files
-      let fullUserMessage = userMessage;
-      if (uploadedFiles.length > 0) {
-        const fileContext = uploadedFiles
-          .map((file) => {
-            return `File: ${file.name} (${file.type})\nContent: ${file.content}`;
-          })
-          .join("\n\n");
-
-        fullUserMessage = `${userMessage}\n\n--- Attached Files ---\n${fileContext}`;
-      }
-
-      try {
-        // Create new chat if none exists
-        let chatId = currentChatId;
-        if (!chatId) {
-          const title = apiService.generateChatTitle(userMessage);
-          const newChat = await apiService.createChat(title);
-          chatId = newChat.id;
-          setCurrentChatId(chatId);
-          setChats((prev) => [newChat, ...prev]);
-        }
-
-        // Add user message to database (only the visible message, not file content)
-        const userDbMessage = await apiService.addMessage(
-          chatId,
-          "user",
-          userMessage
-        );
-        setMessages((prev) => [...prev, userDbMessage]);
-        setMessage("");
-        setUploadedFiles([]); // Clear uploaded files after sending
-        setIsLoading(true);
-
-        // Generate embedding for the user message in the background
-        apiService
-          .generateEmbedding(userDbMessage.id)
-          .catch((err) => console.error("Failed to generate embedding:", err));
-
-        // Create AI response placeholder in database
-        const aiDbMessage = await apiService.addMessage(
-          chatId,
-          "assistant",
-          ""
-        );
-        setMessages((prev) => [...prev, aiDbMessage]);
-
-        // Create abort controller for this request
-        const controller = new AbortController();
-        setAbortController(controller);
-
-        try {
-          // Get conversation context using embeddings
-          const conversationContext = await prepareConversationContext(
-            chatId,
-            userMessage
-          );
-
-          // Add the current user message with file context
-          conversationContext.push({
-            role: "user",
-            content: fullUserMessage,
-          });
-          const response = await sendChatMessage(conversationContext, controller.signal);
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          const reader = response.body?.getReader();
-          if (!reader) {
-            throw new Error("No reader available");
-          }
-
-          let accumulatedText = "";
-
-          while (true) {
-            const { done, value } = await reader.read();
-
-            if (done) break;
-
-            const chunk = new TextDecoder().decode(value);
-            const lines = chunk.split("\n").filter((line) => line.trim());
-
-            for (const line of lines) {
-              try {
-                const data = JSON.parse(line);
-                if (data.message && data.message.content) {
-                  accumulatedText += data.message.content;
-
-                  // Update the AI message in the database and local state
-                  await apiService.updateMessage(
-                    aiDbMessage.id,
-                    accumulatedText
-                  );
-
-                  setMessages((prev) =>
-                    prev.map((msg) =>
-                      msg.id === aiDbMessage.id
-                        ? { ...msg, content: accumulatedText }
-                        : msg
-                    )
-                  );
-                }
-              } catch (parseError) {
-                console.warn("Failed to parse JSON line:", line, parseError);
-              }
-            }
-          }
-
-          // Generate embedding for the AI response in the background
-          apiService
-            .generateEmbedding(aiDbMessage.id)
-            .catch((err) =>
-              console.error("Failed to generate embedding:", err)
-            );
-        } catch (ollamaError) {
-          console.error("Error calling Ollama:", ollamaError);
-
-          // Check if the error is due to abort
-          if (
-            ollamaError instanceof Error &&
-            ollamaError.name === "AbortError"
-          ) {
-            // Request was cancelled, mark the message as canceled for display purposes
-            // The accumulated text is already saved in the database
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === aiDbMessage.id
-                  ? { ...msg, canceled: true }
-                  : msg
-              )
-            );
-            await apiService.cancelMessageGeneration(aiDbMessage.id);
-          } else {
-            // Other error, show error message
-            await apiService.setMessageAsError(aiDbMessage.id);
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === aiDbMessage.id
-                  ? { ...msg, errored: true }
-                  : msg
-              )
-            );
-          }
-        }
-      } catch (error) {
-        console.error("Error in handleSendMessage:", error);
-        toast.error("Something went wrong", {
-          description: "Unable to send the message",
-          duration: 2000,
-        });
-      } finally {
-        setIsLoading(false);
-        setAbortController(null);
-      }
-    }
-  };
-
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollTop } = e.currentTarget;
-    if (scrollTop === 0 && hasMoreMessages && currentChatId) {
-      loadChatMessages(currentChatId, messageOffset, false);
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey && !isLoading && message.trim()) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
-
   const sendChatMessage = useCallback(
     async (
       conversationContext: { role: string; content: string }[],
@@ -407,6 +222,93 @@ function App() {
     },
     [ollamaBaseUrl, selectedModel]
   );
+
+  const handleSendMessage = async () => {
+    if (!healthStatus.server && !healthStatus.ollama) {
+      return;
+    }
+    if (!selectedModel) {
+      toast.error("No model selected", {
+        description: "Please select a model to continue",
+        duration: 2000,
+      });
+      return;
+    }
+    const userMessage = message.trim();
+    if (!userMessage) {
+      toast.error("Message is empty", {
+        description: "Please enter a message to continue",
+        duration: 2000,
+      });
+      return;
+    }
+    // Create new chat if none exists
+    if (!currentChatId) {
+      const title = await apiService.generateChatTitle(userMessage);
+      const newChat = await apiService.createChat(title);
+      setCurrentChatId(newChat.id);
+      setChats((prev) => [newChat, ...prev]);
+    }
+    // Start chat process
+    await startConversationSession({
+      message,
+      uploadedFiles,
+      chatId: currentChatId,
+      setMessages,
+      setMessage,
+      setUploadedFiles,
+      setIsLoading,
+      setAbortController,
+      prepareConversationContext,
+      sendChatMessage,
+      shouldRegenerateMessage: false,
+    })
+  };
+
+  // Regenerate response functionality
+  const handleRegenerateResponse = useCallback(
+    async (message: Message) => {
+      console.log("Regenerating response for message:", message);
+      if (!currentChatId || isLoading || !message || message.role !== "assistant") return;
+      // Start chat process
+      await startConversationSession({
+        message: message.content,
+        regeneratedMessageId: message.id,
+        uploadedFiles,
+        chatId: currentChatId,
+        setMessages,
+        setMessage,
+        setUploadedFiles,
+        setIsLoading,
+        setAbortController,
+        prepareConversationContext,
+        sendChatMessage,
+        shouldRegenerateMessage: true,
+      });
+      setShouldRegenerateMessage(false);
+    },
+    [
+      currentChatId,
+      isLoading,
+      prepareConversationContext,
+      sendChatMessage,
+      uploadedFiles,
+    ]
+  );
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop } = e.currentTarget;
+    if (scrollTop === 0 && hasMoreMessages && currentChatId) {
+      loadChatMessages(currentChatId, messageOffset, false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey && !isLoading && message.trim()) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
 
   // Export chat functionality
   const exportChat = useCallback(() => {
@@ -449,123 +351,6 @@ function App() {
       duration: 2000,
     });
   }, [currentChatId, messages, chats, selectedModel]);
-
-  // Regenerate response functionality
-  const handleRegenerateResponse = useCallback(
-    async (messageId: number) => {
-      if (!currentChatId || isLoading) return;
-
-      // Find the message to regenerate and the user message before it
-      const messageIndex = messages.findIndex((msg) => msg.id === messageId);
-      if (messageIndex <= 0) return;
-
-      const userMessage = messages[messageIndex - 1];
-      if (userMessage.role !== "user") return;
-
-      try {
-        setIsLoading(true);
-
-        // Remove all messages after the user message
-        const messagesToKeep = messages.slice(0, messageIndex);
-        setMessages(messagesToKeep);
-
-        // Delete the AI response from database
-        await apiService.deleteMessage(messageId);
-
-        // Create new AI response
-        const aiDbMessage = await apiService.addMessage(
-          currentChatId,
-          "assistant",
-          ""
-        );
-        setMessages((prev) => [...prev, aiDbMessage]);
-
-        // Create abort controller for this request
-        const controller = new AbortController();
-        setAbortController(controller);
-
-        // Get conversation context using embeddings
-        const conversationContext = await prepareConversationContext(
-          currentChatId,
-          userMessage.content
-        );
-
-        // Add the user message
-        conversationContext.push({
-          role: "user",
-          content: userMessage.content,
-        });
-
-        // Generate new response with context
-        const response = await sendChatMessage(conversationContext, controller.signal);
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const reader = response.body?.getReader();
-        if (!reader) {
-          throw new Error("No reader available");
-        }
-
-        let accumulatedText = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-
-          if (done) break;
-
-          const chunk = new TextDecoder().decode(value);
-          const lines = chunk.split("\n").filter((line) => line.trim());
-
-          for (const line of lines) {
-            try {
-              const data = JSON.parse(line);
-              if (data.message && data.message.content) {
-                accumulatedText += data.message.content;
-
-                await apiService.updateMessage(aiDbMessage.id, accumulatedText);
-
-                setMessages((prev) =>
-                  prev.map((msg) =>
-                    msg.id === aiDbMessage.id
-                      ? { ...msg, content: accumulatedText }
-                      : msg
-                  )
-                );
-              }
-            } catch (parseError) {
-              console.warn("Failed to parse JSON line:", line, parseError);
-            }
-          }
-        }
-
-        // Generate embedding for the new response
-        apiService
-          .generateEmbedding(aiDbMessage.id)
-          .catch((err) => console.error("Failed to generate embedding:", err));
-
-        toast.success("Response regenerated", {
-          duration: 2000,
-        });
-      } catch (error) {
-        console.error("Error regenerating response:", error);
-        toast.error("Failed to regenerate response", {
-          duration: 2000,
-        });
-      } finally {
-        setIsLoading(false);
-        setAbortController(null);
-      }
-    },
-    [
-      currentChatId,
-      messages,
-      isLoading,
-      prepareConversationContext,
-      sendChatMessage
-    ]
-  );
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -665,6 +450,8 @@ function App() {
             handleScroll={handleScroll}
             selectedModel={selectedModel}
             onRegenerateResponse={handleRegenerateResponse}
+            setShouldRegenerateMessage={setShouldRegenerateMessage}
+            shouldRegenerateMessage={shouldRegenerateMessage}
             deleteMessage={(messageId: number) => {
               apiService.deleteMessage(messageId).then(() => {
                 setMessages((prev) =>
