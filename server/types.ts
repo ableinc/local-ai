@@ -81,6 +81,20 @@ export interface OllamaTags {
   models: OllamaModel[];
 }
 
+export interface OllamaChatResponse {
+  model: string;
+  created_at: string;
+  response: string;
+  done: boolean;
+  done_reason: string;
+  total_duration: number;
+  load_duration: number;
+  prompt_eval_count: number;
+  prompt_eval_duration: number;
+  eval_count: number;
+  eval_duration: number;
+}
+
 export interface ErrorLog {
   id: number | bigint;
   error_message: string;

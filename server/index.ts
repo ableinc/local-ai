@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { dbService } from './database-service.ts';
-import type { OllamaTags, Chat, Message, MessageEmbedding, AppSetting, McpServer, ErrorLog } from './types.ts';
+import type { OllamaTags, Chat, Message, MessageEmbedding, AppSetting, McpServer, ErrorLog, OllamaChatResponse } from './types.ts';
 import { installOllamaEmbeddingModelIfNeeded, installOllamaSummaryModelIfNeeded } from './utils.ts';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -35,6 +35,7 @@ function killCurrentProcess(): void {
   try {
     // Clear error logs in database
     dbService.clearErrorLogs();
+    dbService.close();
     process.kill(process.pid, 'SIGHUP')
     process.exit(0)
   } catch (err) {
@@ -238,6 +239,40 @@ app.post('/api/chats/:id/messages', async (req: express.Request, res: express.Re
   }
 });
 
+app.post('/api/chats/title', async (req: express.Request, res: express.Response): Promise<void | express.Response<unknown, Record<string, unknown>>> => {
+  try {
+    const { message } = req.body;
+    if (!message || typeof message !== 'string') {
+      return res.status(422).json({ error: 'Invalid message parameter' });
+    }
+    const response = await fetch(`${ollamaApiUrl}/api/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: summarizationModelName,
+        prompt: `ONLY Generate a concise title (max 6 words) for the following chat conversation: ${message}`,
+        temperature: 0.7,
+        stop: ['\n'],
+        stream: false
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`Ollama API error: ${response.statusText}`);
+    }
+    const data: OllamaChatResponse = await response.json();
+    let title = data.response?.trim() || '';
+    if (title.length === 0) {
+      title = dbService.generateChatTitleFallback(message);
+    }
+    res.json({ data: title });
+  } catch (error) {
+    console.error('Error generating chat title:', error);
+    res.status(200).json({ data: 'New Chat' });
+  }
+});
+
 app.put('/api/messages/:id', async (req: express.Request, res: express.Response): Promise<void | express.Response<unknown, Record<string, unknown>>> => {
   try {
     const { id } = req.params;
@@ -374,7 +409,11 @@ app.post('/api/chats/:id/context', async (req: express.Request, res: express.Res
 app.get('/api/settings', async (req: express.Request, res: express.Response): Promise<void> => {
   try {
     const data: AppSetting[] = dbService.getAppSettings();
-    res.json({ data });
+    const result: Record<string, boolean | number | string> = {};
+    data.forEach((setting) => {
+      result[setting.title] = setting.toggle;
+    });
+    res.json({ data: result });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
@@ -383,7 +422,12 @@ app.get('/api/settings', async (req: express.Request, res: express.Response): Pr
 app.put('/api/settings', async (req: express.Request, res: express.Response): Promise<void> => {
   try {
     dbService.updateAppSettings(req.body);
-    res.json({ message: 'success' })
+    const data: AppSetting[] = dbService.getAppSettings();
+    const result: Record<string, boolean | number | string> = {};
+    data.forEach((setting) => {
+      result[setting.title] = setting.toggle;
+    });
+    res.json({ data: result })
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
@@ -438,35 +482,6 @@ app.put('/api/mcp-servers/:id', async (req: express.Request, res: express.Respon
   }
 });
 
-app.post('/api/chat/title', async (req: express.Request, res: express.Response): Promise<void | express.Response<unknown, Record<string, unknown>>> => {
-  try {
-    const { message } = req.body;
-    if (!message || typeof message !== 'string') {
-      return res.status(422).json({ error: 'Invalid message parameter' });
-    }
-    const response = await fetch(`${ollamaApiUrl}/api/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: summarizationModelName,
-        prompt: `Generate a concise title (max 6 words) for the following chat conversation:\n${message}\nONLY RETURN THE TITLE TEXT.`,
-        temperature: 0.7,
-        stop: ['\n']
-      })
-    });
-    if (!response.ok) {
-      throw new Error(`Ollama API error: ${response.statusText}`);
-    }
-    const data: { text: string } = await response.json();
-    res.json({ data: data.text.trim() });
-  } catch (error) {
-    console.error('Error generating chat title:', error);
-    res.status(500).json({ error: 'Failed to generate chat title' });
-  }
-});
-
 app.get('/api/error-logs', async (req: express.Request, res: express.Response): Promise<void> => {
   try {
     const errorLogs: ErrorLog[] = dbService.getErrorLogs();
@@ -490,13 +505,11 @@ process.on('uncaughtException', (error) => {
 // Add graceful shutdown handling
 process.on('SIGINT', () => {
   console.log('Received SIGINT, shutting down gracefully...');
-  dbService.close();
   killCurrentProcess()
 });
 
 process.on('SIGTERM', () => {
   console.log('Received SIGTERM, shutting down gracefully...');
-  dbService.close();
   killCurrentProcess()
 });
 

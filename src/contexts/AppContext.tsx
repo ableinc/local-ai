@@ -62,8 +62,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
   const saveSettings = async (newSettings: AppSettings) => {
     try {
-      await apiService.saveAppSettings(newSettings);
-      const response = await apiService.getAppSettings();
+      const response = await apiService.saveAppSettings(newSettings);
       setSettings(response);
     } catch (error) {
       console.error(error);

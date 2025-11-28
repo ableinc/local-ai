@@ -245,27 +245,38 @@ function App() {
       });
       return;
     }
-    // Create new chat if none exists
-    if (!currentChatId) {
-      const title = await apiService.generateChatTitle(userMessage);
-      const newChat = await apiService.createChat(title);
-      setCurrentChatId(newChat.id);
-      setChats((prev) => [newChat, ...prev]);
+    try {
+      setIsLoading(true);
+      // Create new chat if none exists
+      if (!currentChatId) {
+        const title = await apiService.generateChatTitle(userMessage);
+        const newChat = await apiService.createChat(title);
+        setCurrentChatId(newChat.id);
+        setChats((prev) => [newChat, ...prev]);
+      }
+      // Start chat process
+      await startConversationSession({
+        message,
+        uploadedFiles,
+        chatId: currentChatId,
+        setMessages,
+        setMessage,
+        setUploadedFiles,
+        setIsLoading,
+        setAbortController,
+        prepareConversationContext,
+        sendChatMessage,
+        shouldRegenerateMessage: false,
+      })
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      toast.error("Something went wrong", {
+        description: "Unable to send the message",
+        duration: 2000,
+      });
+    } finally {
+      setIsLoading(false);
     }
-    // Start chat process
-    await startConversationSession({
-      message,
-      uploadedFiles,
-      chatId: currentChatId,
-      setMessages,
-      setMessage,
-      setUploadedFiles,
-      setIsLoading,
-      setAbortController,
-      prepareConversationContext,
-      sendChatMessage,
-      shouldRegenerateMessage: false,
-    })
   };
 
   // Regenerate response functionality

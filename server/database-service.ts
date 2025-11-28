@@ -290,11 +290,11 @@ class DatabaseService {
   }
 
   // Generate chat title from first user message
-  generateChatTitle(firstMessage: string): string {
+  generateChatTitleFallback(message: string): string {
     // Take first 50 characters and add ellipsis if longer
-    const title = firstMessage.length > 50 
-      ? firstMessage.substring(0, 50) + '...' 
-      : firstMessage;
+    const title = message.length > 50 
+      ? message.substring(0, 50) + '...' 
+      : message;
     return title;
   }
 

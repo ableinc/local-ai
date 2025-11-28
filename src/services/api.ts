@@ -126,7 +126,7 @@ class ApiService {
       body: JSON.stringify({ message })
     });
     if (!response.ok) throw new Error('Failed to generate chat title');
-    return (response.json() as Promise<{ data: { title: string } }>).then(res => res.data.title);
+    return (response.json() as Promise<{ data: string }>).then(res => res.data);
   }
 
   async generateEmbedding(messageId: number): Promise<number[]> {
