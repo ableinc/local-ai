@@ -1,5 +1,5 @@
 import { toast } from "sonner";
-import { apiService, type Message } from "@/services/api";
+import { apiService, type Message, type OllamaChatMessageField } from "@/services/api";
 import type { UploadedFile } from "@/components/app-file-upload";
 
 interface ConversationSessionProps {
@@ -7,19 +7,15 @@ interface ConversationSessionProps {
   regeneratedMessageId?: number;
   uploadedFiles: UploadedFile[];
   chatId: number | null;
+  setCurrentChatId?: React.Dispatch<React.SetStateAction<number | null>>;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setMessage: React.Dispatch<React.SetStateAction<string>>;
   setUploadedFiles: React.Dispatch<
     React.SetStateAction<UploadedFile[]>
   >;
-  setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
   setAbortController: React.Dispatch<React.SetStateAction<AbortController | null>>;
-  prepareConversationContext: (chatId: number, currentMessage: string) => Promise<{
-    role: string;
-    content: string;
-  }[]>;
+  prepareConversationWithContext: (chatId: number, currentMessage: string, isRegenerated: boolean) => Promise<OllamaChatMessageField[]>;
   sendChatMessage: (messages: { role: string; content: string }[], signal: AbortSignal) => Promise<Response>;
-  shouldRegenerateMessage: boolean;
 }
 
 export async function startConversationSession({
@@ -27,14 +23,13 @@ export async function startConversationSession({
   regeneratedMessageId,
   uploadedFiles,
   chatId,
+  setCurrentChatId,
   setMessages,
   setMessage,
   setUploadedFiles,
-  setIsLoading,
   setAbortController,
-  prepareConversationContext,
+  prepareConversationWithContext,
   sendChatMessage,
-  shouldRegenerateMessage,
 }: ConversationSessionProps): Promise<void> {
   if (typeof chatId !== "number") {
     toast.error("No chat selected", {
@@ -43,76 +38,63 @@ export async function startConversationSession({
     });
     return;
   }
-  setIsLoading(true);
+  if (setCurrentChatId) {
+    setCurrentChatId(chatId);
+  }
   // Include file context if there are uploaded files
   let fullMessageWithFileContent;
   if (uploadedFiles.length > 0) {
-    const fileContext = uploadedFiles
-      .map((file) => {
-        return `File: ${file.name} (${file.type})\nContent: ${file.content}`;
+    // Upload file
+    Promise.all(
+      uploadedFiles.map((file) =>
+        apiService.addFileContent(
+          file.content,
+          file.name,
+          chatId,
+          file.type
+        )
+      )
+    )
+      .then(() => {
+        console.log("Files uploaded successfully");
       })
-      .join("\n\n");
-
-    fullMessageWithFileContent = `${message}\n\n--- Attached Files ---\n${fileContext}`;
+      .catch((err) => {
+        console.error("Error uploading files:", err);
+      });
+    fullMessageWithFileContent = `${message}\nALSO USE THIS FILE CONTENT AS CONTEXT:\n${uploadedFiles.map(file => file.content).join("\n")}`;
   }
 
   try {
-    if (!shouldRegenerateMessage) {
+    if (regeneratedMessageId === undefined) {
       // Add user message to database
       const userDbMessage = await apiService.addMessage(
         chatId,
         "user",
-        message
+        message,
+        false
       );
       setMessages((prev) => [...prev, userDbMessage]);
       setMessage("");
-
-      // Generate embedding for the user message in the background
-      apiService
-        .generateEmbedding(userDbMessage.id)
-        .catch((err) => console.error("Failed to generate embedding:", err));
     }
-    let aiDbMessage: Message;
-    if (!shouldRegenerateMessage) {
-      // Create AI response placeholder in database
-      aiDbMessage = await apiService.addMessage(
-        chatId,
-        "assistant",
-        ""
-      );
+    // Create placeholder for AI message
+    const aiDbMessage: Message = await getNewOrExistingAssitantMessage(chatId, regeneratedMessageId);
+    if (regeneratedMessageId === undefined) {
       setMessages((prev) => [...prev, aiDbMessage]);
-    } else {
-      aiDbMessage = {
-        id: regeneratedMessageId!,
-        chat_id: chatId,
-        role: "assistant",
-        content: message,
-        created_at: "",
-      } as Message;
     }
-
     // Create abort controller for this request
     const controller = new AbortController();
     setAbortController(controller);
 
     try {
-      // Get conversation context using embeddings
-      const conversationContext = await prepareConversationContext(
+      // Get conversation with memory context (if user enabled) using embeddings
+      const conversation = await prepareConversationWithContext(
         chatId,
-        message
+        fullMessageWithFileContent || message,
+        regeneratedMessageId !== undefined
       );
-      console.log('Is regeneration message:', shouldRegenerateMessage);
-      console.log('--- Conversation Context ---');
-      console.log(conversationContext);
-      console.log('----------------------------');
-      
-      // Add the current user message with file context
-      conversationContext.push({
-        role: shouldRegenerateMessage ? "assistant" : "user",
-        content: fullMessageWithFileContent || message,
-      });
+
       // Send chat message request to Ollama
-      const response = await sendChatMessage(conversationContext, controller.signal);
+      const response = await sendChatMessage(conversation, controller.signal);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -161,15 +143,11 @@ export async function startConversationSession({
       // Update the AI message in the database
       await apiService.updateMessage(
         aiDbMessage.id,
-        accumulatedText
+        accumulatedText,
+        false,
+        false,
+        regeneratedMessageId !== undefined
       );
-
-      // Generate embedding for the AI response in the background
-      apiService
-        .generateEmbedding(aiDbMessage.id)
-        .catch((err) =>
-          console.error("Failed to generate embedding:", err)
-        );
     } catch (ollamaError) {
       console.error("Error calling Ollama:", ollamaError);
 
@@ -207,8 +185,21 @@ export async function startConversationSession({
       duration: 2000,
     });
   } finally {
-    setIsLoading(false);
     setAbortController(null);
     setUploadedFiles([]); // Clear uploaded files after sending
   }
+}
+
+async function getNewOrExistingAssitantMessage(chatId: number, existingMessageId?: number): Promise<Message> {
+  if (existingMessageId !== undefined) {
+    const existingMessage: Message = await apiService.getMessageById(existingMessageId);
+    return existingMessage;
+  }
+  const aiDbMessage: Message = await apiService.addMessage(
+    chatId,
+    "assistant",
+    "",
+    true
+  );
+  return aiDbMessage;
 }

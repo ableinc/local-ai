@@ -11,7 +11,7 @@ import { AppModelDropdown } from "@/components/app-model-dropdown";
 import { AppModeDropdown } from "@/components/app-mode-dropdown";
 import type { AppMode } from "@/components/app-mode-dropdown";
 import { AppModelExportBtn } from "@/components/app-model-export-btn";
-import { apiService, type Chat, type Message } from "@/services/api";
+import { apiService, type Chat, type Message, type OllamaChatMessageField } from "@/services/api";
 import { useApp } from "@/hooks/useApp";
 import type { UploadedFile } from "@/components/app-file-upload";
 import "highlight.js/styles/github-dark.css";
@@ -157,23 +157,31 @@ function App() {
   }, [ollamaBaseUrl, healthStatus, selectedModel]);
 
   // Add helper function to prepare context with embeddings
-  const prepareConversationContext = useCallback(
+  const prepareConversationWithContext = useCallback(
     async (
       chatId: number,
-      currentMessage: string
-    ): Promise<Array<{ role: string; content: string }>> => {
+      currentMessage: string,
+      isRegenerated: boolean
+    ): Promise<OllamaChatMessageField[]> => {
       try {
-        const context: Array<{ role: string; content: string }> = [];
+        const context: OllamaChatMessageField[] = [];
         if (!settings.use_memory) {
-          return context;
+          return [{
+            role: "user",
+            content: currentMessage,
+          }];
         }
         // Get relevant context using embeddings
-        const contextMessages = await apiService.getConversationContext(
+        const contextMessages = await apiService.getConversationWithContext(
           chatId,
-          currentMessage,
-          5, // Get 5 most recent messages
-          3 // Get 3 most similar messages
+          10
         );
+        if (contextMessages.length === 0) {
+          return [{
+            role: "user",
+            content: currentMessage,
+          }];
+        };
         // Add system instruction first
         context.push({
           role: "system",
@@ -184,19 +192,25 @@ function App() {
         // Add context messages after system instruction
         contextMessages.forEach((msg) => {
           context.push({
-            role: "system",
+            role: msg.role,
             content: msg.content,
           });
         });
-
+        // Add the current user message at the end
+        if (!isRegenerated) {
+          context.push({
+            role: "user",
+            content: currentMessage,
+          });
+        }
         return context;
       } catch (error) {
         console.error("Failed to get conversation context:", error);
         // Fallback to empty context with system prompt
         return [
           {
-            role: "system",
-            content: "You are a helpful AI assistant.",
+            role: "user",
+            content: currentMessage
           },
         ];
       }
@@ -251,23 +265,32 @@ function App() {
       if (!currentChatId) {
         const title = await apiService.generateChatTitle(userMessage);
         const newChat = await apiService.createChat(title);
-        setCurrentChatId(newChat.id);
         setChats((prev) => [newChat, ...prev]);
+        await startConversationSession({
+          message,
+          uploadedFiles,
+          chatId: newChat.id,
+          setCurrentChatId,
+          setMessages,
+          setMessage,
+          setUploadedFiles,
+          setAbortController,
+          prepareConversationWithContext,
+          sendChatMessage,
+        });
+      } else {
+        await startConversationSession({
+          message,
+          uploadedFiles,
+          chatId: currentChatId,
+          setMessages,
+          setMessage,
+          setUploadedFiles,
+          setAbortController,
+          prepareConversationWithContext,
+          sendChatMessage,
+        });
       }
-      // Start chat process
-      await startConversationSession({
-        message,
-        uploadedFiles,
-        chatId: currentChatId,
-        setMessages,
-        setMessage,
-        setUploadedFiles,
-        setIsLoading,
-        setAbortController,
-        prepareConversationContext,
-        sendChatMessage,
-        shouldRegenerateMessage: false,
-      })
     } catch (error) {
       console.error("Failed to send message:", error);
       toast.error("Something went wrong", {
@@ -284,27 +307,32 @@ function App() {
     async (message: Message) => {
       console.log("Regenerating response for message:", message);
       if (!currentChatId || isLoading || !message || message.role !== "assistant") return;
-      // Start chat process
-      await startConversationSession({
-        message: message.content,
-        regeneratedMessageId: message.id,
-        uploadedFiles,
-        chatId: currentChatId,
-        setMessages,
-        setMessage,
-        setUploadedFiles,
-        setIsLoading,
-        setAbortController,
-        prepareConversationContext,
-        sendChatMessage,
-        shouldRegenerateMessage: true,
-      });
-      setShouldRegenerateMessage(false);
+      try {
+        setIsLoading(true);
+        // Start chat process
+        await startConversationSession({
+          message: message.content,
+          regeneratedMessageId: message.id,
+          uploadedFiles,
+          chatId: currentChatId,
+          setMessages,
+          setMessage,
+          setUploadedFiles,
+          setAbortController,
+          prepareConversationWithContext,
+          sendChatMessage,
+        });
+        setShouldRegenerateMessage(false);
+      } catch (error) {
+        console.error("Failed to regenerate message:", error);
+      } finally {
+        setIsLoading(false);
+      }
     },
     [
       currentChatId,
       isLoading,
-      prepareConversationContext,
+      prepareConversationWithContext,
       sendChatMessage,
       uploadedFiles,
     ]

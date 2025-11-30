@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { dbService } from './database-service.ts';
-import type { OllamaTags, Chat, Message, MessageEmbedding, AppSetting, McpServer, ErrorLog, OllamaChatResponse } from './types.ts';
+import type { OllamaTags, Chat, Message, AppSetting, McpServer, ErrorLog, OllamaGenerateResponse, OllamaEmbeddingsResponse } from './types.ts';
 import { installOllamaEmbeddingModelIfNeeded, installOllamaSummaryModelIfNeeded } from './utils.ts';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -91,10 +91,10 @@ app.get('/api/health', async (req: express.Request, res: express.Response): Prom
   }
 });
 
-app.get('/api/embeddings', async (req: express.Request, res: express.Response): Promise<void | express.Response<unknown, Record<string, unknown>>> => {
+app.post('/api/embeddings', async (req: express.Request, res: express.Response): Promise<void | express.Response<unknown, Record<string, unknown>>> => {
   try {
-    const { text } = req.query;
-    if (!text || typeof text !== 'string') {
+    const { text } = req.body;
+    if (!text) {
       return res.status(400).json({ error: 'Invalid text parameter' });
     }
     const response = await fetch(`${ollamaApiUrl}/api/embeddings`, {
@@ -110,7 +110,7 @@ app.get('/api/embeddings', async (req: express.Request, res: express.Response): 
     if (!response.ok) {
       throw new Error(`Ollama API error: ${response.statusText}`);
     }
-    const data: { embedding: number[] } = await response.json();
+    const data: OllamaEmbeddingsResponse = await response.json();
     res.json({
       data: data.embedding
     });
@@ -228,11 +228,37 @@ app.get('/api/chats/:id/messages', async (req: express.Request, res: express.Res
 app.post('/api/chats/:id/messages', async (req: express.Request, res: express.Response): Promise<void | express.Response<unknown, Record<string, unknown>>> => {
   try {
     const { id } = req.params;
-    const { role, content } = req.body;
-    if (!id || !role || !content) {
+    const { role, content, placeholder } = req.body;
+    if (!id || !role || (!content && !placeholder)) {
       return res.status(422).json({ error: 'Chat ID, role, and content are required' });
     }
-    const message = dbService.addMessage(parseInt(id), role, content);
+    const message: Message | null = dbService.addMessage(parseInt(id), role, content);
+    if (!message) {
+      return res.status(400).json({ error: 'Failed to add message' });
+    }
+    // Generate embedding
+    fetch(`${ollamaApiUrl}/api/embeddings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: embeddingModelName,
+        prompt: message.content
+      })
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          console.error('Failed to generate embedding using Ollama API');
+        }
+        const data: OllamaEmbeddingsResponse = await response.json();
+        // Save embedding
+        dbService.saveEmbedding(message.id, data.embedding);
+      })
+      .catch((error) => {
+        console.error('Error generating embedding using Ollama API:', error);
+      });
+    
     res.json({ data: message });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -245,14 +271,14 @@ app.post('/api/chats/title', async (req: express.Request, res: express.Response)
     if (!message || typeof message !== 'string') {
       return res.status(422).json({ error: 'Invalid message parameter' });
     }
-    const response = await fetch(`${ollamaApiUrl}/api/chat`, {
+    const response = await fetch(`${ollamaApiUrl}/api/generate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: summarizationModelName,
-        prompt: `ONLY Generate a concise title (max 6 words) for the following chat conversation: ${message}`,
+        prompt: `Generate a concise title (max 6 words) for the following chat conversation, DO NOT ANSWER THE PROMPT ONLY GENERATE A TITLE SUMMARIZING THE PROMPT: ${message}`,
         temperature: 0.7,
         stop: ['\n'],
         stream: false
@@ -261,7 +287,7 @@ app.post('/api/chats/title', async (req: express.Request, res: express.Response)
     if (!response.ok) {
       throw new Error(`Ollama API error: ${response.statusText}`);
     }
-    const data: OllamaChatResponse = await response.json();
+    const data: OllamaGenerateResponse = await response.json();
     let title = data.response?.trim() || '';
     if (title.length === 0) {
       title = dbService.generateChatTitleFallback(message);
@@ -273,14 +299,55 @@ app.post('/api/chats/title', async (req: express.Request, res: express.Response)
   }
 });
 
+app.get('/api/messages/:id', async (req: express.Request, res: express.Response): Promise<void | express.Response<unknown, Record<string, unknown>>> => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(422).json({ error: 'Message ID is required' });
+    }
+    const message: Message | null = dbService.getMessageById(parseInt(id));
+    if (!message) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+    res.json({ data: message });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 app.put('/api/messages/:id', async (req: express.Request, res: express.Response): Promise<void | express.Response<unknown, Record<string, unknown>>> => {
   try {
     const { id } = req.params;
-    const { content, canceled } = req.body;
-    if (!id || !content || !canceled) {
-      return res.status(422).json({ error: 'Message ID, content, and canceled status are required' });
+    const { content, canceled, errored, regenerated } = req.body;
+    if (!id || !content || canceled === undefined || errored === undefined || regenerated === undefined) {
+      return res.status(422).json({ error: 'Message ID, content, canceled, errored, and regenerated status are required' });
     }
-    dbService.updateMessage(parseInt(id), content, canceled);
+    dbService.updateMessage(parseInt(id), content, canceled, errored, regenerated);
+    // If not canceled or errored generate embedding
+    if (!canceled && !errored) {
+      // Generate embedding
+      fetch(`${ollamaApiUrl}/api/embeddings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: embeddingModelName,
+          prompt: content
+        })
+      })
+        .then(async (response) => {
+          if (!response.ok) {
+            console.error('Failed to generate embedding using Ollama API');
+          }
+          const data: OllamaEmbeddingsResponse = await response.json();
+          // Save embedding
+          dbService.saveEmbedding(parseInt(id), data.embedding);
+        })
+        .catch((error) => {
+          console.error('Error generating embedding using Ollama API:', error);
+        });
+    }
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -326,50 +393,8 @@ app.delete('/api/messages/:id', async (req: express.Request, res: express.Respon
   }
 });
 
-// Embedding endpoints
-app.post('/api/messages/:id/embedding', async (req: express.Request, res: express.Response): Promise<void | express.Response<unknown, Record<string, unknown>>> => {
-  try {
-    const { id } = req.params;
-    if (!id) {
-      return res.status(422).json({ error: 'Message ID is required' });
-    }
-    const message: Message | null = dbService.getMessageById(parseInt(id));
-    
-    if (!message) {
-      return res.status(404).json({ error: 'Message not found' });
-    }
-    // Check if embedding already exists
-    const existingEmbedding: MessageEmbedding | null = dbService.getEmbedding(message.id);
-    if (existingEmbedding) {
-      return res.json({ data: existingEmbedding });
-    }
-    // Generate embedding
-    const response = await fetch(`${ollamaApiUrl}/api/embeddings`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: embeddingModelName,
-        prompt: message.content
-      })
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to generate embedding');
-    }
-    const data: { embedding: number[] } = await response.json();
-    // Save embedding
-    dbService.saveEmbedding(message.id, data.embedding);
-    res.json({ data: data.embedding });
-  } catch (error) {
-    console.error('Error generating embedding:', error);
-    res.status(500).json({ error: 'Failed to generate embedding' });
-  }
-});
-
 // Get conversation context using embeddings
-app.post('/api/chats/:id/context', async (req: express.Request, res: express.Response): Promise<void | express.Response<unknown, Record<string, unknown>>> => {
+app.post('/api/chats/:id/context/similar', async (req: express.Request, res: express.Response): Promise<void | express.Response<unknown, Record<string, unknown>>> => {
   try {
     const { id } = req.params;
     const { message, recentCount = 5, similarCount = 3 } = req.body;
@@ -393,7 +418,7 @@ app.post('/api/chats/:id/context', async (req: express.Request, res: express.Res
       throw new Error('Failed to generate embedding');
     }
     
-    const currentMessageEmbeddingData: { embedding: number[] } = await embeddingResponse.json();
+    const currentMessageEmbeddingData: OllamaEmbeddingsResponse = await embeddingResponse.json();
     const chatId = parseInt(id);
     
     // // Get similar messages
@@ -402,6 +427,27 @@ app.post('/api/chats/:id/context', async (req: express.Request, res: express.Res
     res.json({ data: similarMessages});
   } catch (error) {
     console.error('Error getting context:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get('/api/chats/:id/context', async (req: express.Request, res: express.Response): Promise<void | express.Response<unknown, Record<string, unknown>>> => {
+  try {
+    const { id } = req.params;
+    const { limit = 10, regenerate = "false" } = req.query;
+    if (!id) {
+      return res.status(422).json({ error: 'Chat ID is required' });
+    }
+    const chatId = parseInt(id);
+    const messages: Message[] = dbService.getChatMessages(chatId, parseInt(limit as string), 0, "DESC");
+    // Return in chronological order
+    messages.reverse();
+    if (regenerate === "true") {
+      // Exclude the last message (the one being regenerated)
+      messages.pop();
+    }
+    res.json({ data: messages });
+  } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
 });
@@ -486,6 +532,48 @@ app.get('/api/error-logs', async (req: express.Request, res: express.Response): 
   try {
     const errorLogs: ErrorLog[] = dbService.getErrorLogs();
     res.json({ data: errorLogs });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post('/api/files/upload', async (req: express.Request, res: express.Response): Promise<void | express.Response<unknown, Record<string, unknown>>> => {
+  try {
+    const { chat_id, filename, type, content } = req.body;
+    if (!chat_id || !filename || !type || !content) {
+      return res.status(422).json({ error: 'Chat ID, filename, type, and content are required' });
+    }
+    const file = dbService.addFileUpload(chat_id, filename, type, content);
+    res.json({ data: file });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get('/api/files/:id', async (req: express.Request, res: express.Response): Promise<void | express.Response<unknown, Record<string, unknown>>> => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(422).json({ error: 'File ID is required' });
+    }
+    const file = dbService.getFileUploadById(parseInt(id));
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+    res.json({ data: file });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get('/api/files/:chat_id/chat', async (req: express.Request, res: express.Response): Promise<void | express.Response<unknown, Record<string, unknown>>> => {
+  try {
+    const { chat_id } = req.params;
+    if (!chat_id) {
+      return res.status(422).json({ error: 'Chat ID is required' });
+    }
+    const files = dbService.getFileUploadsByChatId(parseInt(chat_id));
+    res.json({ data: files.map(file => file.filename) });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

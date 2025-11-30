@@ -87,6 +87,7 @@ class DatabaseService {
         content TEXT NOT NULL,
         canceled BOOLEAN NOT NULL DEFAULT 0,
         errored BOOLEAN NOT NULL DEFAULT 0,
+        regenerated BOOLEAN NOT NULL DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (chat_id) REFERENCES chats (id) ON DELETE CASCADE
       )
@@ -253,12 +254,12 @@ class DatabaseService {
     return result.count;
   }
 
-  updateMessage(id: number | bigint, content: string, canceled = false): number {
+  updateMessage(id: number | bigint, content: string, canceled = false, errored = false, regenerated = false): number {
     if (!this.db) throw new Error('Database not initialized');
     const stmt = this.db.prepare(`
-      UPDATE messages SET content = ?, canceled = ? WHERE id = ?
+      UPDATE messages SET content = ?, canceled = ?, errored = ?, regenerated = ? WHERE id = ?
     `);
-    const result: Database.RunResult = stmt.run(content, canceled ? 1 : 0, id);
+    const result: Database.RunResult = stmt.run(content, canceled ? 1 : 0, errored ? 1 : 0, regenerated ? 1 : 0, id);
     return result.changes;
   }
 
@@ -395,7 +396,7 @@ class DatabaseService {
   // Get similar messages using cosine similarity
   getSimilarMessages(chatId: number | bigint, queryEmbedding: number[], limit: number, topK = 5): {
       id: number | bigint;
-      role: "user" | "assistant";
+      role: "user" | "assistant" | "system";
       content: string;
       similarity: number;
   }[] {

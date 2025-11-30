@@ -8,10 +8,11 @@ export interface Chat {
 export interface Message {
   id: number | bigint;
   chat_id: number | bigint;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
   canceled: boolean | number;
   errored: boolean | number;
+  regenerated: boolean | number;
   created_at: string;
 }
 
@@ -56,14 +57,14 @@ export interface FileUpload {
 
 export interface MessageWithEmbedding {
   id: number | bigint;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
   embedding: number[];
 }
 
 export interface MessageWithEmbeddingDB {
   id: number | bigint;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
   embedding: string;
 }
@@ -81,10 +82,15 @@ export interface OllamaTags {
   models: OllamaModel[];
 }
 
+export interface OllamaChatMessageField {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
 export interface OllamaChatResponse {
   model: string;
   created_at: string;
-  response: string;
+  message: OllamaChatMessageField;
   done: boolean;
   done_reason: string;
   total_duration: number;
@@ -95,6 +101,35 @@ export interface OllamaChatResponse {
   eval_duration: number;
 }
 
+export interface OllamaChatStreamResponse {
+  model: string;
+  created_at: string;
+  message: OllamaChatMessageField;
+  done: boolean;
+}
+
+export interface OllamaGenerateResponse {
+  model: string;
+  created_at: string;
+  response: string;
+  done: boolean;
+  done_reason: string;
+  context: number[];
+  total_duration: number;
+  load_duration: number;
+  prompt_eval_count: number;
+  prompt_eval_duration: number;
+  eval_count: number;
+  eval_duration: number;
+}
+
+export interface OllamaGenerateStreamResponse {
+  model: string;
+  created_at: string;
+  response: string;
+  done: boolean;
+}
+
 export interface ErrorLog {
   id: number | bigint;
   error_message: string;
@@ -102,4 +137,8 @@ export interface ErrorLog {
   has_embedding_model: boolean | number;
   has_summary_model: boolean | number;
   created_at: string;
+}
+
+export interface OllamaEmbeddingsResponse {
+  embedding: number[];
 }

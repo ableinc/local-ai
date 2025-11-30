@@ -11,11 +11,12 @@ export interface Chat {
 export interface Message {
   id: number;
   chat_id: number;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
   created_at: string;
   canceled?: boolean;
   errored?: boolean;
+  regenerated?: boolean;
 }
 
 export interface ChatMessagesResponse {
@@ -39,6 +40,54 @@ export interface ErrorLog {
   has_embedding_model: boolean | number;
   has_summary_model: boolean | number;
   created_at: string;
+}
+
+export interface OllamaChatMessageField {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+export interface OllamaChatResponse {
+  model: string;
+  created_at: string;
+  message: OllamaChatMessageField;
+  done: boolean;
+  done_reason: string;
+  total_duration: number;
+  load_duration: number;
+  prompt_eval_count: number;
+  prompt_eval_duration: number;
+  eval_count: number;
+  eval_duration: number;
+}
+
+export interface OllamaChatStreamResponse {
+  model: string;
+  created_at: string;
+  message: OllamaChatMessageField;
+  done: boolean;
+}
+
+export interface OllamaGenerateResponse {
+  model: string;
+  created_at: string;
+  response: string;
+  done: boolean;
+  done_reason: string;
+  context: number[];
+  total_duration: number;
+  load_duration: number;
+  prompt_eval_count: number;
+  prompt_eval_duration: number;
+  eval_count: number;
+  eval_duration: number;
+}
+
+export interface OllamaGenerateStreamResponse {
+  model: string;
+  created_at: string;
+  response: string;
+  done: boolean;
 }
 
 const API_BASE_URL = getApiBaseUrl();
@@ -79,21 +128,27 @@ class ApiService {
     return (response.json() as Promise<{ data: ChatMessagesResponse }>).then(res => res.data);
   }
 
-  async addMessage(chatId: number, role: 'user' | 'assistant', content: string): Promise<Message> {
+  async addMessage(chatId: number, role: 'user' | 'assistant' | 'system', content: string, placeholder: boolean): Promise<Message> {
     const response = await fetch(`${API_BASE_URL}/chats/${chatId}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role, content })
+      body: JSON.stringify({ role, content, placeholder })
     });
     if (!response.ok) throw new Error('Failed to add message');
     return (response.json() as Promise<{ data: Message }>).then(res => res.data);
   }
 
-  async updateMessage(messageId: number, content: string, canceled: boolean = false): Promise<void> {
+  async getMessageById(messageId: number): Promise<Message> {
+    const response = await fetch(`${API_BASE_URL}/messages/${messageId}`);
+    if (!response.ok) throw new Error('Failed to fetch message');
+    return (response.json() as Promise<{ data: Message }>).then(res => res.data);
+  }
+
+  async updateMessage(messageId: number, content: string, canceled: boolean = false, errored: boolean = false, regenerated: boolean = false): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/messages/${messageId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content, canceled })
+      body: JSON.stringify({ content, canceled, errored, regenerated })
     });
     if (!response.ok) throw new Error('Failed to update message');
   }
@@ -129,21 +184,13 @@ class ApiService {
     return (response.json() as Promise<{ data: string }>).then(res => res.data);
   }
 
-  async generateEmbedding(messageId: number): Promise<number[]> {
-    const response = await fetch(`${API_BASE_URL}/messages/${messageId}/embedding`, {
-      method: 'POST',
-    });
-    if (!response.ok) throw new Error('Failed to generate embedding');
-    return (response.json() as Promise<{ data: number[] }>).then(res => res.data);
-  }
-
-  async getConversationContext(
+  async getConversationWithSimilarContext(
     chatId: number, 
     message: string, 
     recentCount: number = 5, 
     similarCount: number = 3
   ): Promise<Message[]> {
-    const response = await fetch(`${API_BASE_URL}/chats/${chatId}/context`, {
+    const response = await fetch(`${API_BASE_URL}/chats/${chatId}/context/similar`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -151,7 +198,16 @@ class ApiService {
       body: JSON.stringify({ message, recentCount, similarCount })
     });
     if (!response.ok) throw new Error('Failed to get conversation context');
-    return (response.json() as Promise<{ context: Message[] }>).then(res => res.context);
+    return (response.json() as Promise<{ data: Message[] }>).then(res => res.data);
+  }
+
+  async getConversationWithContext(
+    chatId: number,
+    limit: number = 10
+  ): Promise<Message[]> {
+    const response = await fetch(`${API_BASE_URL}/chats/${chatId}/context?limit=${limit}`);
+    if (!response.ok) throw new Error('Failed to get conversation context');
+    return (response.json() as Promise<{ data: Message[] }>).then(res => res.data);
   }
 
   async getTags(): Promise<OllamaModel[]> {
@@ -215,6 +271,27 @@ class ApiService {
     const response = await fetch(`${API_BASE_URL}/error-logs`);
     if (!response.ok) throw new Error('Failed to fetch error logs');
     return (response.json() as Promise<{ data: ErrorLog[] }>).then(res => res.data);
+  }
+
+  async addFileContent(content: string, filename: string, chatId: number | bigint, type: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/files/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, filename, chat_id: chatId, type })
+    });
+    if (!response.ok) throw new Error('Failed to add file content');
+  }
+
+  async getFileContentById(id: number | bigint): Promise<string> {
+    const response = await fetch(`${API_BASE_URL}/files/${id}`);
+    if (!response.ok) throw new Error('Failed to fetch file content');
+    return (response.json() as Promise<{ data: { content: string } }>).then(res => res.data.content);
+  }
+
+  async getFileListByChatId(chatId: number | bigint): Promise<{ id: number | bigint; filename: string; type: string; created_at: string; }[]> {
+    const response = await fetch(`${API_BASE_URL}/files/${chatId}/chat`);
+    if (!response.ok) throw new Error('Failed to fetch file list');
+    return (response.json() as Promise<{ data: { id: number | bigint; filename: string; type: string; created_at: string; }[] }>).then(res => res.data);
   }
 }
 
