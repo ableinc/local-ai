@@ -244,7 +244,7 @@ class DatabaseService {
     if (!this.db) throw new Error('Database not initialized');
     const stmt = this.db.prepare(`
       SELECT * FROM messages 
-      WHERE chat_id = ? AND content != ''
+      WHERE chat_id = ?
       ORDER BY created_at ${order} 
       LIMIT ? OFFSET ?
     `);

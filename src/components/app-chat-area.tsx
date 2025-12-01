@@ -46,8 +46,6 @@ interface AppChatAreaProps {
   handleScroll: (event: React.UIEvent<HTMLDivElement>) => void;
   onRegenerateResponse: (message: Message) => void;
   deleteMessage: (messageId: number) => void;
-  setShouldRegenerateMessage: React.Dispatch<React.SetStateAction<boolean>>;
-  shouldRegenerateMessage: boolean;
 }
 
 export function AppChatArea({
@@ -57,8 +55,6 @@ export function AppChatArea({
   handleScroll,
   onRegenerateResponse,
   deleteMessage,
-  setShouldRegenerateMessage,
-  shouldRegenerateMessage,
 }: AppChatAreaProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -204,11 +200,7 @@ export function AppChatArea({
                     {(msg.role === "assistant" &&
                       msg.content === "" &&
                       isLoading &&
-                      msg.id === messages[messages.length - 1]?.id) || (
-                      msg.role === "assistant" &&
-                      isLoading &&
-                      shouldRegenerateMessage
-                      ) && (
+                      msg.id === messages[messages.length - 1]?.id) && (
                         <div className="flex items-center space-x-1">
                           <div className="w-2 h-2 bg-current rounded-full animate-bounce"></div>
                           <div
@@ -260,7 +252,6 @@ export function AppChatArea({
                         <Button
                           hidden={isLoading || !selectedModel || selectedModel.trim() === ""}
                           onClick={() => {
-                            setShouldRegenerateMessage(true);
                             onRegenerateResponse(msg);
                           }}
                           variant="ghost"

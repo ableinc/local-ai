@@ -92,7 +92,8 @@ export async function startConversationSession({
         fullMessageWithFileContent || message,
         regeneratedMessageId !== undefined
       );
-      console.log("Prepared conversation for Ollama:", conversation);
+
+      console.log("assistant message: ", assistantMessage);
 
       // Send chat message request to Ollama
       const response = await sendChatMessage(conversation, controller.signal);
@@ -141,19 +142,13 @@ export async function startConversationSession({
         }
       }
 
-      // Update the AI message in the database
-      // await apiService.updateMessage(
-      //   aiDbMessage.id,
-      //   accumulatedText,
-      //   false,
-      //   false,
-      //   regeneratedMessageId !== undefined
-      // );
-      await apiService.addMessage(
-        chatId,
-        "assistant",
+      // Update the assistant message in the database
+      await apiService.updateMessage(
+        assistantMessage.id,
         accumulatedText,
-        false
+        false,
+        false,
+        regeneratedMessageId !== undefined
       );
     } catch (ollamaError) {
       console.error("Error calling Ollama:", ollamaError);
@@ -202,20 +197,11 @@ async function getNewOrExistingAssitantMessage(chatId: number, existingMessageId
     const existingMessage: Message = await apiService.getMessageById(existingMessageId);
     return existingMessage;
   }
-  // const aiDbMessage: Message = await apiService.addMessage(
-  //   chatId,
-  //   "assistant",
-  //   "",
-  //   true
-  // );
-  return {
-    id: Date.now(), // Temporary ID, replace with real ID from DB after response
-    chat_id: chatId,
-    role: "assistant",
-    content: "",
-    canceled: false,
-    errored: false,
-    regenerated: false,
-    created_at: new Date().toISOString(),
-  };
+  const assistantMessage: Message = await apiService.addMessage(
+    chatId,
+    "assistant",
+    "",
+    true
+  );
+  return assistantMessage;
 }

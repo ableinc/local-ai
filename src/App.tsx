@@ -40,7 +40,6 @@ function App() {
     useState<AbortController | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [appMode, setAppMode] = useState<AppMode>('Chat');
-  const [shouldRegenerateMessage, setShouldRegenerateMessage] = useState<boolean>(false);
   const [isErrorLogsOpen, setIsErrorLogsOpen] = useState(false);
 
   const ollamaBaseUrl = import.meta.env.VITE_OLLAMA_BASE_URL;
@@ -277,10 +276,10 @@ function App() {
   // Regenerate response functionality
   const handleRegenerateResponse = useCallback(
     async (message: Message) => {
-      console.log("Regenerating response for message:", message);
       if (!currentChatId || isLoading || !message || message.role !== "assistant") return;
       try {
         setIsLoading(true);
+        toast.info("Regenerating response...", { duration: 2000 });
         // Start chat process
         await startConversationSession({
           message: message.content,
@@ -294,7 +293,6 @@ function App() {
           prepareConversationWithContext,
           sendChatMessage,
         });
-        setShouldRegenerateMessage(false);
       } catch (error) {
         console.error("Failed to regenerate message:", error);
       } finally {
@@ -480,8 +478,6 @@ function App() {
             handleScroll={handleScroll}
             selectedModel={selectedModel}
             onRegenerateResponse={handleRegenerateResponse}
-            setShouldRegenerateMessage={setShouldRegenerateMessage}
-            shouldRegenerateMessage={shouldRegenerateMessage}
             deleteMessage={(messageId: number) => {
               apiService.deleteMessage(messageId).then(() => {
                 setMessages((prev) =>
