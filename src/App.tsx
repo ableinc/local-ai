@@ -161,10 +161,9 @@ function App() {
     async (
       chatId: number,
       currentMessage: string,
-      isRegenerated: boolean
+      isRegenerated?: boolean
     ): Promise<OllamaChatMessageField[]> => {
       try {
-        const context: OllamaChatMessageField[] = [];
         if (!settings.use_memory) {
           return [{
             role: "user",
@@ -172,41 +171,14 @@ function App() {
           }];
         }
         // Get relevant context using embeddings
-        const contextMessages = await apiService.getConversationWithContext(
+        const context: OllamaChatMessageField[] = await apiService.getConversationWithContext(
           chatId,
-          10
+          10,
+          isRegenerated || false
         );
-        if (contextMessages.length === 0) {
-          return [{
-            role: "user",
-            content: currentMessage,
-          }];
-        };
-        // Add system instruction first
-        context.push({
-          role: "system",
-          content:
-            "You are provided with relevant excerpts from the conversation history for context purposes only. Your task is to respond ONLY to the user's latest message. Use the historical context to inform your response when relevant, but always prioritize and directly address the user's current request. If the user asks something new or gives a different instruction, respond to that new request - do not be constrained by previous conversation topics.",
-        });
-        
-        // Add context messages after system instruction
-        contextMessages.forEach((msg) => {
-          context.push({
-            role: msg.role,
-            content: msg.content,
-          });
-        });
-        // Add the current user message at the end
-        if (!isRegenerated) {
-          context.push({
-            role: "user",
-            content: currentMessage,
-          });
-        }
         return context;
       } catch (error) {
         console.error("Failed to get conversation context:", error);
-        // Fallback to empty context with system prompt
         return [
           {
             role: "user",

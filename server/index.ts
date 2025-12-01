@@ -236,6 +236,10 @@ app.post('/api/chats/:id/messages', async (req: express.Request, res: express.Re
     if (!message) {
       return res.status(400).json({ error: 'Failed to add message' });
     }
+    res.json({ data: message });
+    if (!message.content || message.content.trim() === "") {
+      return;
+    }
     // Generate embedding
     fetch(`${ollamaApiUrl}/api/embeddings`, {
       method: 'POST',
@@ -258,8 +262,6 @@ app.post('/api/chats/:id/messages', async (req: express.Request, res: express.Re
       .catch((error) => {
         console.error('Error generating embedding using Ollama API:', error);
       });
-    
-    res.json({ data: message });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
@@ -319,12 +321,13 @@ app.put('/api/messages/:id', async (req: express.Request, res: express.Response)
   try {
     const { id } = req.params;
     const { content, canceled, errored, regenerated } = req.body;
-    if (!id || !content || canceled === undefined || errored === undefined || regenerated === undefined) {
-      return res.status(422).json({ error: 'Message ID, content, canceled, errored, and regenerated status are required' });
+    if (!id || content === undefined || canceled === undefined || errored === undefined || regenerated === undefined) {
+      return res.status(422).json({ error: 'Message ID, canceled, errored, and regenerated status are required' });
     }
-    dbService.updateMessage(parseInt(id), content, canceled, errored, regenerated);
+    const data = content.trim();
+    dbService.updateMessage(parseInt(id), data, canceled, errored, regenerated);
     // If not canceled or errored generate embedding
-    if (!canceled && !errored) {
+    if (data !== "" && !canceled && !errored) {
       // Generate embedding
       fetch(`${ollamaApiUrl}/api/embeddings`, {
         method: 'POST',
@@ -333,7 +336,7 @@ app.put('/api/messages/:id', async (req: express.Request, res: express.Response)
         },
         body: JSON.stringify({
           model: embeddingModelName,
-          prompt: content
+          prompt: data
         })
       })
         .then(async (response) => {
@@ -439,14 +442,15 @@ app.get('/api/chats/:id/context', async (req: express.Request, res: express.Resp
       return res.status(422).json({ error: 'Chat ID is required' });
     }
     const chatId = parseInt(id);
-    const messages: Message[] = dbService.getChatMessages(chatId, parseInt(limit as string), 0, "DESC");
-    // Return in chronological order
-    messages.reverse();
+    const messages: Message[] = dbService.getChatMessages(chatId, parseInt(limit as string), 0, "ASC");
     if (regenerate === "true") {
       // Exclude the last message (the one being regenerated)
       messages.pop();
     }
-    res.json({ data: messages });
+    res.json({ data: messages.map(message => ({
+      role: message.role,
+      content: message.content
+    })) });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

@@ -203,11 +203,12 @@ class ApiService {
 
   async getConversationWithContext(
     chatId: number,
-    limit: number = 10
-  ): Promise<Message[]> {
-    const response = await fetch(`${API_BASE_URL}/chats/${chatId}/context?limit=${limit}`);
+    limit: number = 10,
+    isRegeneratedMessage: boolean = false
+  ): Promise<OllamaChatMessageField[]> {
+    const response = await fetch(`${API_BASE_URL}/chats/${chatId}/context?limit=${limit}&regenerate=${isRegeneratedMessage}`);
     if (!response.ok) throw new Error('Failed to get conversation context');
-    return (response.json() as Promise<{ data: Message[] }>).then(res => res.data);
+    return (response.json() as Promise<{ data: OllamaChatMessageField[] }>).then(res => res.data);
   }
 
   async getTags(): Promise<OllamaModel[]> {

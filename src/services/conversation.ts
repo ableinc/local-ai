@@ -77,9 +77,9 @@ export async function startConversationSession({
       setMessage("");
     }
     // Create placeholder for AI message
-    const aiDbMessage: Message = await getNewOrExistingAssitantMessage(chatId, regeneratedMessageId);
+    const assistantMessage: Message = await getNewOrExistingAssitantMessage(chatId, regeneratedMessageId);
     if (regeneratedMessageId === undefined) {
-      setMessages((prev) => [...prev, aiDbMessage]);
+      setMessages((prev) => [...prev, assistantMessage]);
     }
     // Create abort controller for this request
     const controller = new AbortController();
@@ -92,6 +92,7 @@ export async function startConversationSession({
         fullMessageWithFileContent || message,
         regeneratedMessageId !== undefined
       );
+      console.log("Prepared conversation for Ollama:", conversation);
 
       // Send chat message request to Ollama
       const response = await sendChatMessage(conversation, controller.signal);
@@ -125,10 +126,10 @@ export async function startConversationSession({
             if (data.message && data.message.content) {
               accumulatedText += data.message.content;
 
-              // Update the AI message in the local state
+              // Update the AI message in the local state    
               setMessages((prev) =>
                 prev.map((msg) =>
-                  msg.id === aiDbMessage.id
+                  msg.id === assistantMessage.id
                     ? { ...msg, content: accumulatedText }
                     : msg
                 )
@@ -141,12 +142,18 @@ export async function startConversationSession({
       }
 
       // Update the AI message in the database
-      await apiService.updateMessage(
-        aiDbMessage.id,
+      // await apiService.updateMessage(
+      //   aiDbMessage.id,
+      //   accumulatedText,
+      //   false,
+      //   false,
+      //   regeneratedMessageId !== undefined
+      // );
+      await apiService.addMessage(
+        chatId,
+        "assistant",
         accumulatedText,
-        false,
-        false,
-        regeneratedMessageId !== undefined
+        false
       );
     } catch (ollamaError) {
       console.error("Error calling Ollama:", ollamaError);
@@ -160,18 +167,18 @@ export async function startConversationSession({
         // The accumulated text is already saved in the database
         setMessages((prev) =>
           prev.map((msg) =>
-            msg.id === aiDbMessage.id
+            msg.id === assistantMessage.id
               ? { ...msg, canceled: true }
               : msg
           )
         );
-        await apiService.cancelMessageGeneration(aiDbMessage.id);
+        await apiService.cancelMessageGeneration(assistantMessage.id);
       } else {
         // Other error, show error message
-        await apiService.setMessageAsError(aiDbMessage.id);
+        await apiService.setMessageAsError(assistantMessage.id);
         setMessages((prev) =>
           prev.map((msg) =>
-            msg.id === aiDbMessage.id
+            msg.id === assistantMessage.id
               ? { ...msg, errored: true }
               : msg
           )
@@ -195,11 +202,20 @@ async function getNewOrExistingAssitantMessage(chatId: number, existingMessageId
     const existingMessage: Message = await apiService.getMessageById(existingMessageId);
     return existingMessage;
   }
-  const aiDbMessage: Message = await apiService.addMessage(
-    chatId,
-    "assistant",
-    "",
-    true
-  );
-  return aiDbMessage;
+  // const aiDbMessage: Message = await apiService.addMessage(
+  //   chatId,
+  //   "assistant",
+  //   "",
+  //   true
+  // );
+  return {
+    id: Date.now(), // Temporary ID, replace with real ID from DB after response
+    chat_id: chatId,
+    role: "assistant",
+    content: "",
+    canceled: false,
+    errored: false,
+    regenerated: false,
+    created_at: new Date().toISOString(),
+  };
 }

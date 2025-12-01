@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { OllamaTags } from './types.ts';
+import { OllamaChatMessageField, OllamaTags } from './types.ts';
 
 export async function installOllamaEmbeddingModelIfNeeded(): Promise<boolean> {
   const modelName = process.env.EMBEDDING_MODEL_NAME || 'nomic-embed-text';
@@ -53,4 +53,11 @@ export async function installOllamaSummaryModelIfNeeded(): Promise<boolean> {
     return false;
   }
   return true;
+}
+
+export function getContextPrompt(): OllamaChatMessageField {
+  return {
+    role: "system",
+    content: "You are provided with relevant excerpts from the conversation history for context purposes only. Your task is to respond ONLY to the user's latest message. Use the historical context to inform your response when relevant, but always prioritize and directly address the user's current request. If the user asks something new or gives a different instruction, respond to that new request - do not be constrained by previous conversation topics."
+  };
 }

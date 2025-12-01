@@ -154,7 +154,18 @@ class DatabaseService {
       INSERT OR IGNORE INTO app_settings (title, toggle, disabled) VALUES
       ('agentic_mode', 0, 0);
     `);
-
+    // Alter tables for new columns if they don't exist
+    // Add new columns if they do not exist (SQLite lacks IF NOT EXISTS for ADD COLUMN)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const messageCols = this.db.prepare(`PRAGMA table_info(messages)`).all().map((c: any) => c.name);
+    if (!messageCols.includes('regenerated')) {
+      this.db.exec(`ALTER TABLE messages ADD COLUMN regenerated BOOLEAN NOT NULL DEFAULT 0;`);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const appSettingCols = this.db.prepare(`PRAGMA table_info(app_settings)`).all().map((c: any) => c.name);
+    if (!appSettingCols.includes('disabled')) {
+      this.db.exec(`ALTER TABLE app_settings ADD COLUMN disabled BOOLEAN NOT NULL DEFAULT 0;`);
+    }
     // Create indexes for better performance
     this.db?.exec(`
       CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages (chat_id);
@@ -233,7 +244,7 @@ class DatabaseService {
     if (!this.db) throw new Error('Database not initialized');
     const stmt = this.db.prepare(`
       SELECT * FROM messages 
-      WHERE chat_id = ? 
+      WHERE chat_id = ? AND content != ''
       ORDER BY created_at ${order} 
       LIMIT ? OFFSET ?
     `);
