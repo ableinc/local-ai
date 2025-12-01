@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { mkdirSync, copyFileSync, existsSync } from 'fs';
-import type { Chat, Message, MessageEmbedding, MessageEmbeddingDB, MessageWithEmbedding, MessageWithEmbeddingDB, AppSetting, McpServer, FileUpload, ErrorLog } from './types.js';
+import type { Chat, Message, MessageEmbedding, MessageEmbeddingDB, MessageWithEmbedding, MessageWithEmbeddingDB, AppSetting, McpServer, FileUpload, ErrorLog, ChatContext } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -129,6 +129,7 @@ class DatabaseService {
       CREATE TABLE IF NOT EXISTS file_uploads (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         chat_id INTEGER NOT NULL,
+        message_id INTEGER NOT NULL,
         filename TEXT NOT NULL,
         type TEXT NOT NULL,
         content TEXT NOT NULL,
@@ -252,7 +253,30 @@ class DatabaseService {
     return result.map(message => ({
       ...message,
       canceled: message.canceled === 1,
-      errored: message.errored === 1
+      errored: message.errored === 1,
+      regenerated: message.regenerated === 1
+    }));
+  }
+
+  getChatContext(chatId: number | bigint, limit = 50, offset = 0, order: 'ASC' | 'DESC' = 'ASC'): ChatContext[] {
+    if (!this.db) throw new Error('Database not initialized');
+    const stmt = this.db.prepare(`
+      SELECT m.*, f.content AS file_content
+      FROM messages m
+      LEFT JOIN file_uploads f ON m.chat_id = f.chat_id AND f.message_id = m.id AND f.content != ''
+      WHERE m.chat_id = ?
+        AND m.content != ''
+      ORDER BY m.created_at ${order}
+      LIMIT ? OFFSET ?
+    `);
+    const result = stmt.all(chatId, limit, offset) as ChatContext[];
+    // Append file contents to message content
+    return result.map(message =>  ({
+      ...message,
+      content: message.file_content && message.role === 'user' ? `${message.content}\nUSE THIS AS CONTEXT:\n${message.file_content}` : message.content,
+      canceled: message.canceled === 1,
+      errored: message.errored === 1,
+      regenerated: message.regenerated === 1
     }));
   }
 
@@ -474,13 +498,13 @@ class DatabaseService {
     return result.changes;
   }
 
-  addFileUpload(chatId: number | bigint, filename: string, type: string, content: string): FileUpload | null {
+  addFileUpload(chatId: number | bigint, filename: string, type: string, content: string, messageId: number | bigint): FileUpload | null {
     if (!this.db) throw new Error('Database not initialized');
     const stmt = this.db.prepare(`
-      INSERT INTO file_uploads (chat_id, filename, type, content) 
-      VALUES (?, ?, ?, ?)
+      INSERT INTO file_uploads (chat_id, filename, type, content, message_id) 
+      VALUES (?, ?, ?, ?, ?)
     `);
-    const result: Database.RunResult = stmt.run(chatId, filename, type, content);
+    const result: Database.RunResult = stmt.run(chatId, filename, type, content, messageId);
     return this.getFileUploadById(result.lastInsertRowid);
   }
 

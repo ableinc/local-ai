@@ -1,5 +1,5 @@
 import { toast } from "sonner";
-import { apiService, type Message, type OllamaChatMessageField } from "@/services/api";
+import { apiService, type Message, type OllamaChatMessageField, type FileUpload } from "@/services/api";
 import type { UploadedFile } from "@/components/app-file-upload";
 
 interface ConversationSessionProps {
@@ -41,28 +41,6 @@ export async function startConversationSession({
   if (setCurrentChatId) {
     setCurrentChatId(chatId);
   }
-  // Include file context if there are uploaded files
-  let fullMessageWithFileContent;
-  if (uploadedFiles.length > 0) {
-    // Upload file
-    Promise.all(
-      uploadedFiles.map((file) =>
-        apiService.addFileContent(
-          file.content,
-          file.name,
-          chatId,
-          file.type
-        )
-      )
-    )
-      .then(() => {
-        console.log("Files uploaded successfully");
-      })
-      .catch((err) => {
-        console.error("Error uploading files:", err);
-      });
-    fullMessageWithFileContent = `${message}\nALSO USE THIS FILE CONTENT AS CONTEXT:\n${uploadedFiles.map(file => file.content).join("\n")}`;
-  }
 
   try {
     if (regeneratedMessageId === undefined) {
@@ -75,6 +53,23 @@ export async function startConversationSession({
       );
       setMessages((prev) => [...prev, userDbMessage]);
       setMessage("");
+      // Include file context if there are uploaded files
+      if (uploadedFiles.length > 0) {
+        // Upload file
+        const fileUploadResponses: FileUpload[] = await Promise.all(
+          uploadedFiles.map((file) =>
+            apiService.addFileContent(
+              file.content,
+              file.name,
+              chatId,
+              userDbMessage.id,
+              file.type
+            )
+          )
+        );
+        const fileIds = fileUploadResponses.map(file => file.id);
+        console.log("Files uploaded successfully: ", fileIds);
+      }
     }
     // Create placeholder for AI message
     const assistantMessage: Message = await getNewOrExistingAssitantMessage(chatId, regeneratedMessageId);
@@ -89,11 +84,9 @@ export async function startConversationSession({
       // Get conversation with memory context (if user enabled) using embeddings
       const conversation = await prepareConversationWithContext(
         chatId,
-        fullMessageWithFileContent || message,
+        message,
         regeneratedMessageId !== undefined
       );
-
-      console.log("assistant message: ", assistantMessage);
 
       // Send chat message request to Ollama
       const response = await sendChatMessage(conversation, controller.signal);

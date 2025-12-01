@@ -8,7 +8,7 @@ export class FileProcessor {
       const pdfjsLib = await import('pdfjs-dist');
       
       // Configure worker for safe, local operation
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
       const pdf = await pdfjsLib.getDocument({ 
         data: arrayBuffer,

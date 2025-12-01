@@ -49,6 +49,7 @@ export interface McpServer {
 export interface FileUpload {
   id: number | bigint;
   chat_id: number | bigint;
+  message_id: number | bigint;
   filename: string;
   type: string;
   content: string;
@@ -141,4 +142,16 @@ export interface ErrorLog {
 
 export interface OllamaEmbeddingsResponse {
   embedding: number[];
+}
+
+export interface ChatContext {
+  id: number | bigint;
+  chat_id: number | bigint;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  canceled: number | boolean;
+  errored: number | boolean;
+  regenerated: number | boolean;
+  created_at: string;
+  file_content: string | null;
 }

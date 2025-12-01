@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { dbService } from './database-service.ts';
-import type { OllamaTags, Chat, Message, AppSetting, McpServer, ErrorLog, OllamaGenerateResponse, OllamaEmbeddingsResponse } from './types.ts';
+import type { OllamaTags, Chat, Message, AppSetting, McpServer, ErrorLog, OllamaGenerateResponse, OllamaEmbeddingsResponse, FileUpload } from './types.ts';
 import { installOllamaEmbeddingModelIfNeeded, installOllamaSummaryModelIfNeeded } from './utils.ts';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -344,6 +344,10 @@ app.put('/api/messages/:id', async (req: express.Request, res: express.Response)
             console.error('Failed to generate embedding using Ollama API');
           }
           const data: OllamaEmbeddingsResponse = await response.json();
+          if (!data.embedding || data.embedding.length === 0) {
+            console.error('No embedding returned from Ollama API');
+            return;
+          }
           // Save embedding
           dbService.saveEmbedding(parseInt(id), data.embedding);
         })
@@ -442,7 +446,7 @@ app.get('/api/chats/:id/context', async (req: express.Request, res: express.Resp
       return res.status(422).json({ error: 'Chat ID is required' });
     }
     const chatId = parseInt(id);
-    const messages: Message[] = dbService.getChatMessages(chatId, parseInt(limit as string), 0, "ASC");
+    const messages: Message[] = dbService.getChatContext(chatId, parseInt(limit as string), 0, "ASC");
     if (regenerate === "true") {
       // Exclude the last message (the one being regenerated)
       messages.pop();
@@ -543,11 +547,14 @@ app.get('/api/error-logs', async (req: express.Request, res: express.Response): 
 
 app.post('/api/files/upload', async (req: express.Request, res: express.Response): Promise<void | express.Response<unknown, Record<string, unknown>>> => {
   try {
-    const { chat_id, filename, type, content } = req.body;
-    if (!chat_id || !filename || !type || !content) {
-      return res.status(422).json({ error: 'Chat ID, filename, type, and content are required' });
+    const { chat_id, filename, type, content, message_id } = req.body;
+    if (!chat_id || !filename || !type || !content || !message_id) {
+      return res.status(422).json({ error: 'Chat ID, filename, type, content, and message ID are required' });
     }
-    const file = dbService.addFileUpload(chat_id, filename, type, content);
+    const file: FileUpload | null = dbService.addFileUpload(chat_id, filename, type, content, message_id);
+    if (!file) {
+      return res.status(400).json({ error: 'Failed to upload file' });
+    }
     res.json({ data: file });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -621,7 +628,7 @@ app.listen(PORT, async () => {
     console.log(`Database connection test: Found ${chats.length} chats`);
     if (!hasInstalledEmbeddingModel || !hasInstalledSummaryModel) {
       dbService.addErrorLog(
-        'Missing required models',
+        'Missing required models and/or Ollama API is not reachable.',
         '',
         hasInstalledEmbeddingModel,
         hasInstalledSummaryModel

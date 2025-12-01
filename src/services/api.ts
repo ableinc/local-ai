@@ -90,6 +90,16 @@ export interface OllamaGenerateStreamResponse {
   done: boolean;
 }
 
+export interface FileUpload {
+  id: number | bigint;
+  chat_id: number | bigint;
+  message_id: number | bigint;
+  filename: string;
+  type: string;
+  content: string;
+  created_at: string;
+}
+
 const API_BASE_URL = getApiBaseUrl();
 
 class ApiService {
@@ -274,13 +284,14 @@ class ApiService {
     return (response.json() as Promise<{ data: ErrorLog[] }>).then(res => res.data);
   }
 
-  async addFileContent(content: string, filename: string, chatId: number | bigint, type: string): Promise<void> {
+  async addFileContent(content: string, filename: string, chatId: number | bigint, messageId: number | bigint, type: string): Promise<FileUpload> {
     const response = await fetch(`${API_BASE_URL}/files/upload`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content, filename, chat_id: chatId, type })
+      body: JSON.stringify({ content, filename, chat_id: chatId, message_id: messageId, type })
     });
     if (!response.ok) throw new Error('Failed to add file content');
+    return (response.json() as Promise<{ data: FileUpload }>).then(res => res.data);
   }
 
   async getFileContentById(id: number | bigint): Promise<string> {
