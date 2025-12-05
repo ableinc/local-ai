@@ -149,6 +149,15 @@ class ApiService {
     return (response.json() as Promise<{ data: Chat }>).then(res => res.data);
   }
 
+  async updateChatTitle(id: number, title: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/chats/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title })
+    });
+    if (!response.ok) throw new Error('Failed to update chat title');
+  }
+
   async deleteChat(id: number): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/chats/${id}`, {
       method: 'DELETE'

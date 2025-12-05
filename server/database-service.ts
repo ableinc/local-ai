@@ -203,6 +203,15 @@ class DatabaseService {
     return stmt.get(id) as Chat;
   }
 
+  updateChatTitle(id: number | bigint, title: string): number {
+    if (!this.db) throw new Error('Database not initialized');
+    const stmt = this.db.prepare(`
+      UPDATE chats SET title = ? WHERE id = ?
+    `);
+    const result: Database.RunResult = stmt.run(title, id);
+    return result.changes;
+  }
+
   updateChatTimestamp(chatId: number | bigint): number {
     if (!this.db) throw new Error('Database not initialized');
     const stmt = this.db.prepare(`
@@ -407,7 +416,7 @@ class DatabaseService {
   }
 
   // Calculate cosine similarity between two vectors
-  cosineSimilarity(vecA: number[], vecB: number[]): number {
+  _cosineSimilarity(vecA: number[], vecB: number[]): number {
     let dotProduct = 0;
     let normA = 0;
     let normB = 0;
@@ -439,7 +448,7 @@ class DatabaseService {
     
     // Calculate cosine similarity for each message
     const similarities = messagesWithEmbeddings.map(msg => {
-      const similarity = this.cosineSimilarity(queryEmbedding, msg.embedding);
+      const similarity = this._cosineSimilarity(queryEmbedding, msg.embedding);
       return {
         id: msg.id,
         role: msg.role,

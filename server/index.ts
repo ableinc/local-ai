@@ -197,6 +197,20 @@ app.get('/api/chats/:id', async (req: express.Request, res: express.Response): P
   }
 });
 
+app.put('/api/chats/:id', async (req: express.Request, res: express.Response): Promise<void | express.Response<unknown, Record<string, unknown>>> => {
+  try {
+    const { id } = req.params;
+    const { title } = req.body;
+    if (!id || !title) {
+      return res.status(422).json({ error: 'Chat ID and title are required' });
+    }
+    dbService.updateChatTitle(parseInt(id), title);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 app.delete('/api/chats/:id', async (req: express.Request, res: express.Response): Promise<void | express.Response<unknown, Record<string, unknown>>> => {
   try {
     const { id } = req.params;
@@ -313,7 +327,7 @@ app.post('/api/chats/title', async (req: express.Request, res: express.Response)
     if (title.length === 0) {
       title = dbService.generateChatTitleFallback(message);
     }
-    res.json({ data: title });
+    res.json({ data: title.replace(/[^a-zA-Z0-9\s]/g, '').trim() });
   } catch (error) {
     console.error('Error generating chat title:', error);
     res.status(200).json({ data: 'New Chat' });

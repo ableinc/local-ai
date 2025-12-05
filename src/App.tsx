@@ -215,9 +215,29 @@ function App() {
       setIsLoading(true);
       // Create new chat if none exists
       if (!currentChatId) {
-        const title = await apiService.generateChatTitle(userMessage);
-        const newChat = await apiService.createChat(title);
+        // Create new chat, will update title later
+        const newChat = await apiService.createChat("..."); // Temporary title
         setChats((prev) => [newChat, ...prev]);
+        // Generate chat title (async)
+        apiService.generateChatTitle(userMessage)
+          .then(async (title) => {
+              apiService.updateChatTitle(newChat.id, title)
+                .then(() => {
+                  // Update chat title in local state
+                  setChats((prev) =>
+                    prev.map((chat) =>
+                      chat.id === newChat.id ? { ...chat, title } : chat
+                    )
+                  );
+                })
+                .catch(() => {
+                  console.error("Failed to update chat title");
+                });
+          })
+          .catch((error) => {
+            console.error("Failed to generate chat title:", error);
+          });
+        // Start chat process
         await startConversationSession({
           message,
           uploadedFiles,
@@ -435,7 +455,7 @@ function App() {
 
           {/* Model Selection Dropdown */}
           <AppModelDropdown
-            availableModels={appHealth.models}
+            availableModels={appHealth.models || []}
             selectedModel={selectedModel || ""}
             setSelectedModel={setSelectedModel}
             isLoading={isLoading}
