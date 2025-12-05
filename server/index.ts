@@ -73,18 +73,37 @@ app.get('/api/health', async (req: express.Request, res: express.Response): Prom
       method: 'GET',
       signal: AbortSignal.timeout(5000) // 5 second timeout
     });
-    
+
+    if (!ollamaResponse.ok) {
+      throw new Error(`Ollama API error: ${ollamaResponse.statusText}`);
+    }
+
+    const tags: OllamaTags = await ollamaResponse.json();
+    const hasEmbeddingModel = tags.models.some((model) => model.name.includes(embeddingModelName!));
+    const hasSummarizationModel = tags.models.some((model) => model.name === summarizationModelName);
+    if (!hasEmbeddingModel || !hasSummarizationModel) {
+      dbService.addErrorLog(
+        'Missing required models.',
+        '',
+        hasEmbeddingModel,
+        hasSummarizationModel
+      );
+    }
     res.status(ollamaResponse.ok ? 200 : 503).json({
       data: {
         server: true,
-        ollama: ollamaResponse.ok,
+        ollama: ollamaResponse.ok && hasEmbeddingModel && hasSummarizationModel,
+        tags: tags.models,
+        errorLogs: dbService.getErrorLogs(),
         timestamp: new Date().toISOString()
       }
     });
   } catch (error) {
     res.status(500).json({ 
-      server: false, 
-      ollama: false, 
+      server: true, 
+      ollama: false,
+      tags: [],
+      errorLogs: dbService.getErrorLogs(),
       error: (error as Error).message,
       timestamp: new Date().toISOString()
     });

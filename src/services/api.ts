@@ -1,6 +1,4 @@
-import type { AppSettings } from "@/contexts/AppContextTypes";
 import { getApiBaseUrl } from "@/lib/utils";
-import type { OllamaModel } from "@/lib/utils";
 export interface Chat {
   id: number;
   title: string;
@@ -98,6 +96,32 @@ export interface FileUpload {
   type: string;
   content: string;
   created_at: string;
+}
+export interface OllamaModel {
+  name: string;
+  model: string;
+  modified_at: string;
+  size: number;
+  digest: string;
+  details: Record<string, string | number | string[]>;
+}
+
+export interface OllamaTags {
+  models: Array<OllamaModel>;
+}
+
+export interface AppHealth {
+  server: boolean;
+  ollama: boolean;
+  tags: OllamaModel[];
+  models?: { name: string }[];
+  errorLogs: ErrorLog[];
+  timestamp?: string;
+}
+
+export interface AppSettings {
+  use_memory: boolean;
+  agentic_mode: boolean;
 }
 
 const API_BASE_URL = getApiBaseUrl();
@@ -221,19 +245,19 @@ class ApiService {
     return (response.json() as Promise<{ data: OllamaChatMessageField[] }>).then(res => res.data);
   }
 
-  async getTags(): Promise<OllamaModel[]> {
-    const response = await fetch(`${API_BASE_URL}/tags`);
-    if (!response.ok) throw new Error('Failed to fetch tags');
-    return (response.json() as Promise<{ data: OllamaModel[] }>).then(res => res.data);
-  }
+  // async getTags(): Promise<OllamaModel[]> {
+  //   const response = await fetch(`${API_BASE_URL}/tags`);
+  //   if (!response.ok) throw new Error('Failed to fetch tags');
+  //   return (response.json() as Promise<{ data: OllamaModel[] }>).then(res => res.data);
+  // }
 
-  async checkHealth(): Promise<{ server: boolean, ollama: boolean, timestamp: string }> {
+  async checkHealth(): Promise<AppHealth> {
     const response = await fetch(`${API_BASE_URL}/health`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
     });
     if (!response.ok) throw new Error('Failed to check health');
-    return (response.json() as Promise<{ data: {server: boolean, ollama: boolean, timestamp: string } }>).then(res => res.data);
+    return (response.json() as Promise<{ data: AppHealth }>).then(res => res.data);
   }
 
   async getAppSettings(): Promise<AppSettings> {

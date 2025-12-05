@@ -5,7 +5,6 @@ interface AppModelDropdownProps {
   availableModels: { name: string }[];
   selectedModel: string;
   setSelectedModel: (model: string) => void;
-  modelsLoading: boolean;
   isLoading: boolean;
 }
 
@@ -32,7 +31,6 @@ export function AppModelDropdown({
   availableModels,
   selectedModel,
   setSelectedModel,
-  modelsLoading,
   isLoading,
 }: AppModelDropdownProps) {
   return (
@@ -43,11 +41,11 @@ export function AppModelDropdown({
       <Select
         value={selectedModel}
         onChange={(e) => setSelectedModel(e.target.value)}
-        disabled={modelsLoading || isLoading}
+        disabled={isLoading}
         className="w-48 cursor-pointer"
       >
-        {modelsLoading ? (
-          <option key={"0"}>Loading models...</option>
+        {availableModels.length === 0 ? (
+          <option key={"0"}>No models...</option>
         ) : availableModels.length > 0 ? (
           getModelOptions(availableModels)
         ) : null}

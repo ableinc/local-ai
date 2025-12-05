@@ -19,19 +19,16 @@ import "@/App.css";
 import { AppModelStatusIndicator } from "@/components/app-model-status-indicator";
 import { toast } from "sonner";
 import { getModes } from "@/lib/utils";
-import type { OllamaModel } from "@/lib/utils";
-import { startConversationSession } from "./services/conversation";
-import { AppErrorAlerts } from "./components/app-error-alerts";
+import { startConversationSession } from "@/services/conversation";
+import { AppErrorAlerts } from "@/components/app-error-alerts";
 import { AlertTriangle } from "lucide-react";
 
 function App() {
-  const { healthStatus, checkHealth, settings, appErrorLogs } = useApp();
+  const { appHealth, settings } = useApp();
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
-  const [availableModels, setAvailableModels] = useState<OllamaModel[]>([]);
-  const [modelsLoading, setModelsLoading] = useState(true);
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChatId, setCurrentChatId] = useState<number | null>(null);
   const [messageOffset, setMessageOffset] = useState(0);
@@ -139,22 +136,6 @@ function App() {
     });
   }, [abortController]);
 
-  // Fetch available models on component mount
-  useEffect(() => {
-    const fetchModels = async () => {
-      try {
-        const response: OllamaModel[] = await apiService.getTags();
-        setAvailableModels(response);
-      } catch (error) {
-        console.error("Failed to fetch models:", error);
-      } finally {
-        setModelsLoading(false);
-      }
-    };
-
-    fetchModels();
-  }, [ollamaBaseUrl, healthStatus, selectedModel]);
-
   // Add helper function to prepare context with embeddings
   const prepareConversationWithContext = useCallback(
     async (
@@ -212,7 +193,7 @@ function App() {
   );
 
   const handleSendMessage = async () => {
-    if (!healthStatus.server && !healthStatus.ollama) {
+    if (!appHealth.server && !appHealth.ollama) {
       return;
     }
     if (!selectedModel) {
@@ -427,8 +408,7 @@ function App() {
 
           {/* Health Status Indicator */}
           <AppModelStatusIndicator
-            healthStatus={healthStatus}
-            checkHealth={checkHealth}
+            appHealth={appHealth}
           />
 
           <AppModeDropdown
@@ -437,7 +417,7 @@ function App() {
             setAppMode={setAppMode}
           />
 
-          {appErrorLogs.length > 0 && (
+          {appHealth.errorLogs.length > 0 && (
             <button
               onClick={() => setIsErrorLogsOpen(true)}
               className="p-2 rounded-md hover:bg-accent transition-colors cursor-pointer"
@@ -448,17 +428,16 @@ function App() {
           )}
 
           <AppErrorAlerts
-            errorLogs={appErrorLogs}
+            errorLogs={appHealth.errorLogs}
             isOpen={isErrorLogsOpen}
             onClose={() => setIsErrorLogsOpen(false)}
           />
 
           {/* Model Selection Dropdown */}
           <AppModelDropdown
-            availableModels={availableModels}
+            availableModels={appHealth.models}
             selectedModel={selectedModel || ""}
             setSelectedModel={setSelectedModel}
-            modelsLoading={modelsLoading}
             isLoading={isLoading}
           />
           {/* Export Chat Button */}
@@ -501,7 +480,7 @@ function App() {
             isLoading={isLoading}
             handleCancelGeneration={handleCancelGeneration}
             handleSendMessage={handleSendMessage}
-            healthStatus={healthStatus}
+            appHealth={appHealth}
             onFileContent={handleFileContent}
             uploadedFiles={uploadedFiles}
             setUploadedFiles={setUploadedFiles}

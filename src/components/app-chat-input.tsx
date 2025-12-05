@@ -1,6 +1,6 @@
 import { Button } from "./ui/button";
 import { AppFileUpload, type UploadedFile } from "./app-file-upload";
-import type { HealthStatus } from "../contexts/AppContextTypes";
+import type { AppHealth } from "@/services/api";
 
 interface AppChatInputProps {
   message: string;
@@ -9,7 +9,7 @@ interface AppChatInputProps {
   isLoading: boolean;
   handleCancelGeneration: () => void;
   handleSendMessage: () => void;
-  healthStatus: HealthStatus;
+  appHealth: AppHealth;
   onFileContent: (files: UploadedFile[]) => void;
   uploadedFiles: UploadedFile[];
   setUploadedFiles: React.Dispatch<React.SetStateAction<UploadedFile[]>>;
@@ -19,13 +19,13 @@ interface AppChatInputProps {
 
 function getButtonText(
   isLoading: boolean,
-  healthStatus: HealthStatus,
+  appHealth: AppHealth,
   selectedModel: string | null
 ): [string, boolean] {
   if (isLoading) {
     return ["Cancel", false];
   }
-  if (!healthStatus.server || !healthStatus.ollama) {
+  if (!appHealth.server || !appHealth.ollama) {
     return ["Offline", true];
   }
   if (selectedModel && selectedModel.trim() !== "") {
@@ -41,7 +41,7 @@ export function AppChatInput({
   isLoading,
   handleCancelGeneration,
   handleSendMessage,
-  healthStatus,
+  appHealth,
   onFileContent,
   uploadedFiles,
   setUploadedFiles,
@@ -50,7 +50,7 @@ export function AppChatInput({
 }: AppChatInputProps) {
   const [buttonText, buttonDisabled] = getButtonText(
     isLoading,
-    healthStatus,
+    appHealth,
     selectedModel
   );
   return (

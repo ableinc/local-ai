@@ -1,27 +1,14 @@
 import { createContext } from 'react'
-import type { McpServer, ErrorLog } from '@/services/api';
-
-export interface HealthStatus {
-  server: boolean;
-  ollama: boolean;
-  lastChecked: Date | null;
-}
-
-export interface AppSettings {
-  use_memory: boolean;
-  agentic_mode: boolean;
-}
+import type { McpServer, AppHealth, AppSettings } from '@/services/api';
 
 export interface AppContextType {
-  healthStatus: HealthStatus;
-  checkHealth: () => Promise<void>;
+  appHealth: AppHealth;
   settings: AppSettings;
   saveSettings: (newSettings: AppSettings) => Promise<void>;
   mcpServers: McpServer[];
   addMcpServer: (body: McpServer) => Promise<void>;
   deleteMcpServer: (id: number) => Promise<void>;
   getMcpServers: () => Promise<void>;
-  appErrorLogs: ErrorLog[];
 }
 
 export const AppContext = createContext<AppContextType | undefined>(undefined)

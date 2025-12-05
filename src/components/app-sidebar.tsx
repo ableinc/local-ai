@@ -24,7 +24,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { SettingsDialogArea } from "./settings-dialog-area";
 import { Plus, MessageSquare, Trash, Settings } from "lucide-react";
-import { type Chat } from "../services/api";
+import { type Chat } from "@/services/api";
 import { useState } from "react";
 import { DialogDescription } from "@radix-ui/react-dialog";
 

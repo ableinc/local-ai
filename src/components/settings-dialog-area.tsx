@@ -2,7 +2,7 @@ import { useApp } from "@/hooks/useApp";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import type { AppSettings } from "@/contexts/AppContextTypes";
+import type { AppSettings } from "@/services/api";
 import { useState } from "react";
 import { ChevronsUpDown, Loader, Plus, RotateCcw, X as CloseIcon } from "lucide-react";
 import { Separator } from "@/components/ui/separator";

@@ -2,21 +2,22 @@ import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   AppContext,
-  type AppSettings,
   type AppContextType,
-  type HealthStatus,
 } from "./AppContextTypes";
-import { apiService, type McpServer, type ErrorLog } from "@/services/api";
+import { apiService, type McpServer, type AppHealth, type AppSettings } from "@/services/api";
 
 interface AppProviderProps {
   children: React.ReactNode;
 }
 
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
-  const [healthStatus, setHealthStatus] = useState<HealthStatus>({
+  const [appHealth, setAppHealth] = useState<AppHealth>({
     server: false,
     ollama: false,
-    lastChecked: null,
+    timestamp: undefined,
+    tags: [],
+    models: [],
+    errorLogs: [],
   });
   const [settings, setSettings] = useState<AppSettings>({
     use_memory: false,
@@ -24,16 +25,21 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   });
   const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
   const [didNotify, setDidNotify] = useState<boolean>(false);
-  const [appErrorLogs, setAppErrorLogs] = useState<ErrorLog[]>([]);
+  // const [appErrorLogs, setAppErrorLogs] = useState<ErrorLog[]>([]);
+  // const [availableModels, setAvailableModels] = useState<OllamaModel[]>([]);
 
   const checkHealth = async () => {
     try {
-      const response = await apiService.checkHealth();
-      setHealthStatus({
+      const response: AppHealth = await apiService.checkHealth();
+      setAppHealth({
         server: response.server,
         ollama: response.ollama,
-        lastChecked: new Date(),
+        timestamp: response.timestamp,
+        tags: response.tags,
+        models: response.tags.map((model) => ({ name: model.name })),
+        errorLogs: response.errorLogs,
       });
+      // setAppErrorLogs(response.errorLogs);
       if ((!response.server || !response.ollama) && !didNotify) {
         toast.error("Server and/or Ollama", {
           description: `Server and/or Ollama is offline.`,
@@ -41,12 +47,16 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         });
         setDidNotify(true);
       }
+      // setAvailableModels(response.tags || []);
     } catch (error) {
       console.error("Health check failed:", error);
-      setHealthStatus({
+      setAppHealth({
         server: false,
         ollama: false,
-        lastChecked: new Date(),
+        timestamp: new Date().toISOString(),
+        tags: [],
+        models: [],
+        errorLogs: [],
       });
     }
   };
@@ -110,16 +120,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       });
     }
   };
-
-  const getAppErrorLogs = async (): Promise<void> => {
-    try {
-      const errorLogs = await apiService.getAppErrorLogs();
-      setAppErrorLogs(errorLogs);
-    } catch (error) {
-      console.error("Failed to fetch app error logs:", error);
-    }
-  };
-
   // Check health on mount and periodically
   useEffect(() => {
     checkHealth();
@@ -127,24 +127,20 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     getMcpServers();
     // Check health every 5 seconds
     const interval = setInterval(checkHealth, 5000);
-    const errorLogInterval = setInterval(getAppErrorLogs, 60000);
 
     return () => {
       clearInterval(interval);
-      clearInterval(errorLogInterval);
     }
   }, []);
 
   const value: AppContextType = {
-    healthStatus,
-    checkHealth,
+    appHealth: appHealth,
     settings,
     saveSettings,
     mcpServers,
     addMcpServer,
     deleteMcpServer,
     getMcpServers,
-    appErrorLogs,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
